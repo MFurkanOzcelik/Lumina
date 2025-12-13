@@ -17,6 +17,8 @@ export interface Note {
     size: number;
     blob: Blob;
   };
+  // Tags for categorization
+  tags?: string[];
 }
 
 export interface Folder {

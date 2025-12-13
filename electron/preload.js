@@ -7,5 +7,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAppPath: () => ipcRenderer.invoke('get-app-path'),
   platform: process.platform,
   isElectron: true,
+  // Listen for file open events
+  onOpenLumFile: (callback) => {
+    ipcRenderer.on('open-lum-file', (event, data) => callback(data));
+  },
+  // Remove listener
+  removeOpenLumFileListener: () => {
+    ipcRenderer.removeAllListeners('open-lum-file');
+  }
 });
 

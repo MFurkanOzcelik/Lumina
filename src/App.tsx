@@ -10,10 +10,20 @@ import { useNotesStore } from './store/useNotesStore';
 import { applyTheme } from './utils/themes';
 import { migrateFromLocalStorage } from './utils/storage';
 
+// Extend Window interface for TypeScript
+declare global {
+  interface Window {
+    electronAPI?: {
+      onOpenLumFile: (callback: (data: { fileName: string; content: string; filePath: string }) => void) => void;
+      removeOpenLumFileListener: () => void;
+    };
+  }
+}
+
 function App() {
   const { theme, sidebarWidth, sidebarCollapsed, isHydrated: settingsHydrated, hydrate: hydrateSettings, setSidebarWidth, setSidebarCollapsed } =
     useSettingsStore();
-  const { activeNoteId, isHydrated: notesHydrated, hydrate: hydrateNotes } = useNotesStore();
+  const { activeNoteId, isHydrated: notesHydrated, hydrate: hydrateNotes, createNote, setActiveNote } = useNotesStore();
   const [showSettings, setShowSettings] = useState(false);
   const [showOpenButton, setShowOpenButton] = useState(sidebarCollapsed);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -58,6 +68,41 @@ function App() {
     }
   }, [sidebarCollapsed]);
 
+  // Handle .lum file opening from Electron
+  useEffect(() => {
+    if (window.electronAPI?.onOpenLumFile) {
+      window.electronAPI.onOpenLumFile((data) => {
+        const { fileName, content } = data;
+        
+        // Parse markdown content (remove title if it exists)
+        let noteContent = content;
+        let noteTitle = fileName;
+        
+        // If content starts with # title, extract it
+        const titleMatch = content.match(/^#\s+(.+)\n\n/);
+        if (titleMatch) {
+          noteTitle = titleMatch[1];
+          noteContent = content.substring(titleMatch[0].length);
+        }
+        
+        // Create a new note with the imported content
+        const newNoteId = createNote(noteTitle);
+        
+        // Update the note content
+        // We need to wait a bit for the note to be created
+        setTimeout(() => {
+          const notesStore = useNotesStore.getState();
+          notesStore.updateNote(newNoteId, { content: noteContent });
+          setActiveNote(newNoteId);
+        }, 100);
+      });
+      
+      return () => {
+        window.electronAPI?.removeOpenLumFileListener();
+      };
+    }
+  }, [createNote, setActiveNote]);
+
 
   // Show loading screen while initializing
   if (isInitializing || !settingsHydrated || !notesHydrated) {
@@ -101,7 +146,21 @@ function App() {
         )}
       </AnimatePresence>
 
-      <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
+      <motion.div 
+        className="flex-1 flex flex-col h-screen overflow-hidden relative"
+        initial={false}
+        animate={{ 
+          marginLeft: sidebarCollapsed ? 0 : 0,
+          width: '100%'
+        }}
+        transition={{ 
+          duration: 0.75, 
+          ease: "easeInOut" 
+        }}
+        style={{
+          transition: 'all 0.75s ease-in-out'
+        }}
+      >
         {/* Open Sidebar Button - shown only after sidebar close animation completes */}
         <AnimatePresence>
           {showOpenButton && (
@@ -110,21 +169,20 @@ function App() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               whileHover={{ 
-                scale: 1.1,
-                x: 3,
+                scale: 1.05,
                 backgroundColor: 'var(--color-accentHover)'
               }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setSidebarCollapsed(false)}
-              className="absolute top-6 left-6 z-40 p-3 rounded-xl flex items-center justify-center shadow-xl"
+              className="absolute left-6 z-40 p-2 rounded-lg flex items-center justify-center"
               style={{
                 backgroundColor: 'var(--color-accent)',
                 color: 'white',
-                boxShadow: `0 8px 20px var(--color-shadow)`,
+                top: '1rem', // Align with toolbar buttons (py-4 = 1rem top padding)
               }}
               transition={{ duration: 0.3 }}
             >
-              <ChevronRight size={24} />
+              <ChevronRight size={18} />
             </motion.button>
           )}
         </AnimatePresence>
@@ -133,9 +191,9 @@ function App() {
           {activeNoteId ? (
             <motion.div
               key="editor"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
               className="h-full"
             >
@@ -144,9 +202,9 @@ function App() {
           ) : (
             <motion.div
               key="home"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
               className="h-full"
             >
@@ -154,7 +212,7 @@ function App() {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </motion.div>
 
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </div>

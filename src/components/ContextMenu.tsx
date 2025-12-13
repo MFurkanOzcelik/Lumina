@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Edit2, Trash2, FolderInput } from 'lucide-react';
+import { Edit2, Trash2, FolderInput, FileDown } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
 interface ContextMenuProps {
@@ -9,6 +9,7 @@ interface ContextMenuProps {
   onRename: () => void;
   onDelete: () => void;
   onMove?: () => void;
+  onExport?: () => void;
   type: 'note' | 'folder';
 }
 
@@ -19,6 +20,7 @@ export const ContextMenu = ({
   onRename,
   onDelete,
   onMove,
+  onExport,
   type,
 }: ContextMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -85,6 +87,23 @@ export const ContextMenu = ({
             >
               <FolderInput size={16} />
               <span className="text-sm font-medium">Taşı</span>
+            </motion.button>
+          )}
+
+          {/* Export Option - Only for notes */}
+          {type === 'note' && onExport && (
+            <motion.button
+              type="button"
+              whileHover={{ backgroundColor: 'var(--color-bgTertiary)' }}
+              onClick={() => {
+                onExport();
+                onClose();
+              }}
+              className="w-full px-4 py-2 text-left flex items-center gap-3 transition-colors"
+              style={{ color: 'var(--color-text)' }}
+            >
+              <FileDown size={16} />
+              <span className="text-sm font-medium">Export (.lum)</span>
             </motion.button>
           )}
 

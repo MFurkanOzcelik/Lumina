@@ -45,6 +45,7 @@ export const translations = {
     contentArea: 'Content',
     closeSidebar: 'Close Sidebar',
     openSidebar: 'Open Sidebar',
+    startTyping: 'Start typing...',
   },
   tr: {
     welcome: 'Hoşgeldiniz',
@@ -90,6 +91,7 @@ export const translations = {
     contentArea: 'İçerik',
     closeSidebar: 'Kenar Çubuğunu Kapat',
     openSidebar: 'Kenar Çubuğunu Aç',
+    startTyping: 'Yazmaya başla...',
   },
 };
 

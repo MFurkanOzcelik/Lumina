@@ -8,6 +8,7 @@ import { DndContext, DragEndEvent, useDroppable, useDraggable } from '@dnd-kit/c
 import { Modal } from './Modal';
 import { ContextMenu } from './ContextMenu';
 import { MoveFolderModal } from './MoveFolderModal';
+import TurndownService from 'turndown';
 
 interface SidebarProps {
   width: number;
@@ -16,7 +17,7 @@ interface SidebarProps {
   onSettingsClick: () => void;
 }
 
-const DraggableNote = ({ noteId, title, isActive, onClick, onDelete, onRename, onMove }: any) => {
+const DraggableNote = ({ noteId, title, isActive, onClick, onDelete, onRename, onMove, onExport }: any) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -143,6 +144,7 @@ const DraggableNote = ({ noteId, title, isActive, onClick, onDelete, onRename, o
         onRename={handleRename}
         onDelete={() => setShowDeleteConfirm(true)}
         onMove={onMove}
+        onExport={onExport}
         type="note"
       />
       
@@ -193,7 +195,7 @@ const DraggableNote = ({ noteId, title, isActive, onClick, onDelete, onRename, o
   );
 };
 
-const DroppableFolder = ({ folderId, name, notes, activeNoteId, onNoteClick, onNoteDelete, onFolderDelete, onFolderRename, onNoteRename, onNoteMove }: any) => {
+const DroppableFolder = ({ folderId, name, notes, activeNoteId, onNoteClick, onNoteDelete, onFolderDelete, onFolderRename, onNoteRename, onNoteMove, onNoteExport }: any) => {
   const [isOpen, setIsOpen] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -308,6 +310,7 @@ const DroppableFolder = ({ folderId, name, notes, activeNoteId, onNoteClick, onN
                 onDelete={() => onNoteDelete(note.id)}
                 onRename={(newTitle: string) => onNoteRename(note.id, newTitle)}
                 onMove={() => onNoteMove(note.id)}
+                onExport={() => onNoteExport(note.id)}
               />
             ))}
             </motion.div>
@@ -395,6 +398,57 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
 
   const handleNoteMove = (noteId: string) => {
     setMoveNoteId(noteId);
+  };
+
+  const handleNoteExport = (noteId: string) => {
+    const note = notes.find((n) => n.id === noteId);
+    if (!note) return;
+    
+    // Initialize Turndown service
+    const turndownService = new TurndownService({
+      headingStyle: 'atx',
+      codeBlockStyle: 'fenced',
+      bulletListMarker: '-',
+    });
+    
+    // Add custom rule for code blocks
+    turndownService.addRule('codeBlock', {
+      filter: (node: HTMLElement) => {
+        return node.nodeName === 'PRE' && node.querySelector('code') !== null;
+      },
+      replacement: (_content: string, node: HTMLElement) => {
+        const codeElement = node.querySelector('code');
+        const code = codeElement?.textContent || '';
+        return '\n```\n' + code + '\n```\n';
+      }
+    });
+    
+    // Add custom rule for inline code
+    turndownService.addRule('inlineCode', {
+      filter: (node: HTMLElement) => {
+        return node.nodeName === 'CODE' && node.parentElement?.nodeName !== 'PRE';
+      },
+      replacement: (content: string) => {
+        return '`' + content + '`';
+      }
+    });
+    
+    // Convert HTML to Markdown
+    const markdown = turndownService.turndown(note.content);
+    
+    // Create markdown content with title
+    const fullMarkdown = `# ${note.title || 'Untitled Note'}\n\n${markdown}`;
+    
+    // Create blob and download with .lum extension
+    const blob = new Blob([fullMarkdown], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${note.title || 'Untitled Note'}.lum`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -615,6 +669,7 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
                     onFolderRename={(newName: string) => handleFolderRename(folder.id, newName)}
                     onNoteRename={handleNoteRename}
                     onNoteMove={handleNoteMove}
+                    onNoteExport={handleNoteExport}
                   />
                 </motion.div>
               ))}
@@ -636,6 +691,7 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
               onNoteDelete={deleteNote}
               onNoteRename={handleNoteRename}
               onNoteMove={handleNoteMove}
+              onNoteExport={handleNoteExport}
             />
           </div>
         </div>
@@ -683,7 +739,7 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
   );
 };
 
-const DroppableFolderlessArea = ({ notes, activeNoteId, onNoteClick, onNoteDelete, onNoteRename, onNoteMove }: any) => {
+const DroppableFolderlessArea = ({ notes, activeNoteId, onNoteClick, onNoteDelete, onNoteRename, onNoteMove, onNoteExport }: any) => {
   const { setNodeRef, isOver } = useDroppable({
     id: 'folderless',
   });
@@ -723,6 +779,7 @@ const DroppableFolderlessArea = ({ notes, activeNoteId, onNoteClick, onNoteDelet
                 onDelete={() => onNoteDelete(note.id)}
                 onRename={(newTitle: string) => onNoteRename(note.id, newTitle)}
                 onMove={() => onNoteMove(note.id)}
+                onExport={() => onNoteExport(note.id)}
               />
             </motion.div>
           ))

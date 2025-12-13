@@ -65,6 +65,7 @@ export const useNotesStore = create<NotesState>()((set, get) => ({
           folderId,
           createdAt: Date.now(),
           updatedAt: Date.now(),
+          tags: [], // Initialize with empty tags array
         };
         set((state) => {
           const newNotes = [...state.notes, newNote];

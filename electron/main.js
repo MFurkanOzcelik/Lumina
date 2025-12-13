@@ -1,8 +1,10 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const isDev = process.env.NODE_ENV === 'development';
 
 let mainWindow;
+let fileToOpen = null;
 
 function createWindow() {
   // Determine icon path based on environment
@@ -84,9 +86,62 @@ function createWindow() {
   });
 }
 
+// Handle file opening on Windows/Linux (when app is not running)
+if (process.platform === 'win32' || process.platform === 'linux') {
+  // Check if a .lum file was passed as argument
+  const filePath = process.argv.find(arg => arg.endsWith('.lum'));
+  if (filePath && fs.existsSync(filePath)) {
+    fileToOpen = filePath;
+  }
+}
+
+// Handle file opening on macOS (open-file event)
+app.on('open-file', (event, filePath) => {
+  event.preventDefault();
+  if (filePath.endsWith('.lum')) {
+    fileToOpen = filePath;
+    if (mainWindow) {
+      // If window is already open, send the file content
+      readAndSendFile(filePath);
+    }
+  }
+});
+
+// Function to read and send file content to renderer
+function readAndSendFile(filePath) {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const fileName = path.basename(filePath, '.lum');
+    
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send('open-lum-file', {
+        fileName,
+        content,
+        filePath
+      });
+      
+      // Focus the window
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  } catch (error) {
+    console.error('Error reading .lum file:', error);
+  }
+}
+
 // App lifecycle
 app.whenReady().then(() => {
   createWindow();
+  
+  // If a file was queued to open, send it after window is ready
+  if (fileToOpen) {
+    mainWindow.webContents.once('did-finish-load', () => {
+      setTimeout(() => {
+        readAndSendFile(fileToOpen);
+        fileToOpen = null;
+      }, 1000); // Wait for React to initialize
+    });
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
