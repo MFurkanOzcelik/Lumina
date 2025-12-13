@@ -36,6 +36,7 @@ release/__uninstaller-nsis-lumina.exe
 
 # Development scripts
 *.bat
+!build/*.bat
 *.vbs
 *.sh
 
@@ -54,6 +55,7 @@ GITHUB_RELEASE.md
 IKON_GUNCELLEME_RAPORU.md
 IKON_ONERISI.md
 IMPLEMENTATION_SUMMARY.md
+!build/IMPLEMENTATION_SUMMARY.md
 INDEXEDDB_MIGRATION.md
 LATEST_IMPROVEMENTS.md
 LOGO_IMPLEMENTATION.md
