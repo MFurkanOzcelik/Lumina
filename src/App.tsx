@@ -8,17 +8,9 @@ import { Editor } from './components/Editor';
 import { useSettingsStore } from './store/useSettingsStore';
 import { useNotesStore } from './store/useNotesStore';
 import { applyTheme } from './utils/themes';
-import { migrateFromLocalStorage } from './utils/storage';
+import { migrateFromLocalStorage, migrateToFileStorage } from './utils/storage';
 
-// Extend Window interface for TypeScript
-declare global {
-  interface Window {
-    electronAPI?: {
-      onOpenLumFile: (callback: (data: { fileName: string; content: string; filePath: string }) => void) => void;
-      removeOpenLumFileListener: () => void;
-    };
-  }
-}
+// File open handler types (storage types are in electron.d.ts)
 
 function App() {
   const { theme, sidebarWidth, sidebarCollapsed, isHydrated: settingsHydrated, hydrate: hydrateSettings, setSidebarWidth, setSidebarCollapsed } =
@@ -32,10 +24,13 @@ function App() {
   useEffect(() => {
     const initialize = async () => {
       try {
-        // First, migrate any existing LocalStorage data
+        // Step 1: Migrate any existing LocalStorage data to IndexedDB (legacy)
         await migrateFromLocalStorage();
         
-        // Then hydrate both stores from IndexedDB
+        // Step 2: If running in Electron, migrate IndexedDB to file storage
+        await migrateToFileStorage();
+        
+        // Step 3: Hydrate both stores from persistent storage
         await Promise.all([
           hydrateSettings(),
           hydrateNotes(),
@@ -101,7 +96,9 @@ function App() {
       });
       
       return () => {
-        window.electronAPI?.removeOpenLumFileListener();
+        if (window.electronAPI?.removeOpenLumFileListener) {
+          window.electronAPI.removeOpenLumFileListener();
+        }
       };
     }
   }, [createNote, setActiveNote]);

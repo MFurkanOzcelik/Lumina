@@ -1,13 +1,15 @@
 import { get, set, del, clear } from 'idb-keyval';
 
-// Storage keys
+// Storage keys for IndexedDB (for migration only)
 const NOTES_KEY = 'not-app-notes';
 const FOLDERS_KEY = 'not-app-folders';
 const SETTINGS_KEY = 'not-app-settings';
 
-// Generic storage functions
-export const storage = {
-  // Get data from IndexedDB
+// Check if running in Electron
+const isElectron = typeof window !== 'undefined' && window.electronAPI && window.electronAPI.storage;
+
+// IndexedDB storage (fallback for web or migration)
+const idbStorage = {
   async get<T>(key: string): Promise<T | undefined> {
     try {
       return await get(key);
@@ -17,7 +19,6 @@ export const storage = {
     }
   },
 
-  // Set data in IndexedDB
   async set<T>(key: string, value: T): Promise<void> {
     try {
       await set(key, value);
@@ -26,7 +27,6 @@ export const storage = {
     }
   },
 
-  // Delete data from IndexedDB
   async delete(key: string): Promise<void> {
     try {
       await del(key);
@@ -35,7 +35,6 @@ export const storage = {
     }
   },
 
-  // Clear all data
   async clearAll(): Promise<void> {
     try {
       await clear();
@@ -45,37 +44,134 @@ export const storage = {
   },
 };
 
-// Specific storage functions for the app
-export const notesStorage = {
+// File-based storage for Electron
+const fileStorage = {
   async getNotes(): Promise<any[]> {
-    const notes = await storage.get<any[]>(NOTES_KEY);
-    return notes || [];
+    try {
+      if (!window.electronAPI) return [];
+      return await window.electronAPI.storage.getNotes();
+    } catch (error) {
+      console.error('Error getting notes from file storage:', error);
+      return [];
+    }
   },
 
   async saveNotes(notes: any[]): Promise<void> {
-    await storage.set(NOTES_KEY, notes);
+    try {
+      if (!window.electronAPI) return;
+      await window.electronAPI.storage.saveNotes(notes);
+    } catch (error) {
+      console.error('Error saving notes to file storage:', error);
+    }
   },
 
   async getFolders(): Promise<any[]> {
-    const folders = await storage.get<any[]>(FOLDERS_KEY);
-    return folders || [];
+    try {
+      if (!window.electronAPI) return [];
+      return await window.electronAPI.storage.getFolders();
+    } catch (error) {
+      console.error('Error getting folders from file storage:', error);
+      return [];
+    }
   },
 
   async saveFolders(folders: any[]): Promise<void> {
-    await storage.set(FOLDERS_KEY, folders);
+    try {
+      if (!window.electronAPI) return;
+      await window.electronAPI.storage.saveFolders(folders);
+    } catch (error) {
+      console.error('Error saving folders to file storage:', error);
+    }
   },
 
   async getSettings(): Promise<any> {
-    const settings = await storage.get<any>(SETTINGS_KEY);
-    return settings || null;
+    try {
+      if (!window.electronAPI) return null;
+      return await window.electronAPI.storage.getSettings();
+    } catch (error) {
+      console.error('Error getting settings from file storage:', error);
+      return null;
+    }
   },
 
   async saveSettings(settings: any): Promise<void> {
-    await storage.set(SETTINGS_KEY, settings);
+    try {
+      if (!window.electronAPI) return;
+      await window.electronAPI.storage.saveSettings(settings);
+    } catch (error) {
+      console.error('Error saving settings to file storage:', error);
+    }
+  },
+
+  async clearAll(): Promise<void> {
+    try {
+      if (!window.electronAPI) return;
+      await window.electronAPI.storage.clearAll();
+    } catch (error) {
+      console.error('Error clearing file storage:', error);
+    }
+  },
+};
+
+// Main storage API - uses file storage in Electron, IndexedDB as fallback
+export const notesStorage = {
+  async getNotes(): Promise<any[]> {
+    if (isElectron) {
+      return await fileStorage.getNotes();
+    } else {
+      const notes = await idbStorage.get<any[]>(NOTES_KEY);
+      return notes || [];
+    }
+  },
+
+  async saveNotes(notes: any[]): Promise<void> {
+    if (isElectron) {
+      await fileStorage.saveNotes(notes);
+    } else {
+      await idbStorage.set(NOTES_KEY, notes);
+    }
+  },
+
+  async getFolders(): Promise<any[]> {
+    if (isElectron) {
+      return await fileStorage.getFolders();
+    } else {
+      const folders = await idbStorage.get<any[]>(FOLDERS_KEY);
+      return folders || [];
+    }
+  },
+
+  async saveFolders(folders: any[]): Promise<void> {
+    if (isElectron) {
+      await fileStorage.saveFolders(folders);
+    } else {
+      await idbStorage.set(FOLDERS_KEY, folders);
+    }
+  },
+
+  async getSettings(): Promise<any> {
+    if (isElectron) {
+      return await fileStorage.getSettings();
+    } else {
+      const settings = await idbStorage.get<any>(SETTINGS_KEY);
+      return settings || null;
+    }
+  },
+
+  async saveSettings(settings: any): Promise<void> {
+    if (isElectron) {
+      await fileStorage.saveSettings(settings);
+    } else {
+      await idbStorage.set(SETTINGS_KEY, settings);
+    }
   },
 
   async clearAllData(): Promise<void> {
-    await storage.clearAll();
+    if (isElectron) {
+      await fileStorage.clearAll();
+    } else {
+      await idbStorage.clearAll();
+    }
   },
 };
 
@@ -99,23 +195,83 @@ export function debounce<T extends (...args: any[]) => any>(
   };
 }
 
-// Migration utility: Move data from LocalStorage to IndexedDB
+// Migration utility: Move data from IndexedDB to file storage (Electron)
+export async function migrateToFileStorage(): Promise<void> {
+  if (!isElectron) {
+    console.log('Not running in Electron, skipping file storage migration');
+    return;
+  }
+
+  try {
+    console.log('Starting migration from IndexedDB to file storage...');
+    
+    // Check if file storage already has data
+    const existingNotes = await fileStorage.getNotes();
+    if (existingNotes && existingNotes.length > 0) {
+      console.log('File storage already has data, skipping migration');
+      return;
+    }
+
+    // Get data from IndexedDB
+    const idbNotes = await idbStorage.get<any[]>(NOTES_KEY);
+    const idbFolders = await idbStorage.get<any[]>(FOLDERS_KEY);
+    const idbSettings = await idbStorage.get<any>(SETTINGS_KEY);
+
+    // Migrate notes
+    if (idbNotes && idbNotes.length > 0) {
+      await fileStorage.saveNotes(idbNotes);
+      console.log(`Migrated ${idbNotes.length} notes from IndexedDB to file storage`);
+    }
+
+    // Migrate folders
+    if (idbFolders && idbFolders.length > 0) {
+      await fileStorage.saveFolders(idbFolders);
+      console.log(`Migrated ${idbFolders.length} folders from IndexedDB to file storage`);
+    }
+
+    // Migrate settings
+    if (idbSettings) {
+      await fileStorage.saveSettings(idbSettings);
+      console.log('Migrated settings from IndexedDB to file storage');
+    }
+
+    // Clear IndexedDB after successful migration
+    await idbStorage.clearAll();
+    console.log('Migration completed successfully, IndexedDB cleared');
+
+    // Log storage location
+    if (window.electronAPI) {
+      const userDataPath = await window.electronAPI.storage.getUserDataPath();
+      console.log('Data is now stored in:', userDataPath);
+    }
+  } catch (error) {
+    console.error('Error during migration to file storage:', error);
+  }
+}
+
+// Legacy migration: Move data from LocalStorage to current storage
 export async function migrateFromLocalStorage(): Promise<void> {
   try {
     // Check if data exists in LocalStorage
     const localNotes = localStorage.getItem('not-app-notes');
     const localSettings = localStorage.getItem('not-app-settings');
 
+    if (!localNotes && !localSettings) {
+      return; // No data to migrate
+    }
+
+    console.log('Starting migration from LocalStorage...');
+
     // Migrate notes
     if (localNotes) {
       const parsedNotes = JSON.parse(localNotes);
       if (parsedNotes?.state?.notes) {
         await notesStorage.saveNotes(parsedNotes.state.notes);
-        console.log('Migrated notes from LocalStorage to IndexedDB');
+        console.log('Migrated notes from LocalStorage');
       }
       if (parsedNotes?.state?.folders) {
         await notesStorage.saveFolders(parsedNotes.state.folders);
-        console.log('Migrated folders from LocalStorage to IndexedDB');
+        console.log('Migrated folders from LocalStorage');
       }
     }
 
@@ -124,7 +280,7 @@ export async function migrateFromLocalStorage(): Promise<void> {
       const parsedSettings = JSON.parse(localSettings);
       if (parsedSettings?.state) {
         await notesStorage.saveSettings(parsedSettings.state);
-        console.log('Migrated settings from LocalStorage to IndexedDB');
+        console.log('Migrated settings from LocalStorage');
       }
     }
 
@@ -132,9 +288,9 @@ export async function migrateFromLocalStorage(): Promise<void> {
     localStorage.removeItem('not-app-notes');
     localStorage.removeItem('not-app-folders');
     localStorage.removeItem('not-app-settings');
-    console.log('Migration completed successfully');
+    console.log('LocalStorage migration completed successfully');
   } catch (error) {
-    console.error('Error during migration:', error);
+    console.error('Error during LocalStorage migration:', error);
   }
 }
 
