@@ -781,27 +781,21 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
                 {/* Create New Note Button - More Prominent */}
                 <motion.button
                   type="button"
-                  whileHover={{ 
-                    scale: 1.15,
-                    rotate: 90,
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-                  }}
+                  whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => createNote(null)}
-                  className="p-2 rounded-lg transition-all"
+                  onClick={() => {
+                    const newNoteId = createNote(null);
+                    setActiveNote(newNoteId);
+                  }}
+                  className="p-1.5 rounded-lg transition-all"
                   style={{ 
                     backgroundColor: 'var(--color-accent)',
                     color: 'white',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
                   }}
                   title={t('createNewNote')}
-                  transition={{ 
-                    type: 'spring',
-                    stiffness: 400,
-                    damping: 17
-                  }}
                 >
-                  <Plus size={18} strokeWidth={2.5} />
+                  <Plus size={16} strokeWidth={2.5} />
                 </motion.button>
 
                 {/* Create Folder Button */}
