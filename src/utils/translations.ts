@@ -46,6 +46,10 @@ export const translations = {
     closeSidebar: 'Close Sidebar',
     openSidebar: 'Open Sidebar',
     startTyping: 'Start typing...',
+    filterByTags: 'Filter by Tags',
+    clearFilters: 'Clear Filters',
+    tagsAvailable: 'tags available',
+    tagAvailable: 'tag available',
   },
   tr: {
     welcome: 'Hoşgeldiniz',
@@ -92,6 +96,10 @@ export const translations = {
     closeSidebar: 'Kenar Çubuğunu Kapat',
     openSidebar: 'Kenar Çubuğunu Aç',
     startTyping: 'Yazmaya başla...',
+    filterByTags: 'Etiketlere Göre Filtrele',
+    clearFilters: 'Filtreleri Temizle',
+    tagsAvailable: 'etiket mevcut',
+    tagAvailable: 'etiket mevcut',
   },
 };
 

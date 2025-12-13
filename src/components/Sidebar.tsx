@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, FolderPlus, Trash2, ChevronRight, ChevronDown, FileText, ChevronLeft, GripVertical, Settings } from 'lucide-react';
+import { Search, FolderPlus, Trash2, ChevronRight, ChevronDown, FileText, ChevronLeft, GripVertical, Settings, Tag, X } from 'lucide-react';
 import { useNotesStore } from '../store/useNotesStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useTranslation } from '../utils/translations';
@@ -9,6 +9,7 @@ import { Modal } from './Modal';
 import { ContextMenu } from './ContextMenu';
 import { MoveFolderModal } from './MoveFolderModal';
 import TurndownService from 'turndown';
+import { getTagColor } from '../utils/tagUtils';
 
 interface SidebarProps {
   width: number;
@@ -381,6 +382,8 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
   const [showFolderInput, setShowFolderInput] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [moveNoteId, setMoveNoteId] = useState<string | null>(null);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [showTagPanel, setShowTagPanel] = useState(true);
 
   const { notes, folders, activeNoteId, setActiveNote, deleteNote, updateNote, createFolder, updateFolder, deleteFolder, moveNoteToFolder } =
     useNotesStore();
@@ -478,11 +481,36 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
     }
   }, [isResizing]);
 
-  const filteredNotes = notes.filter((note) =>
-    note.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Get all unique tags from all notes
+  const allTags = Array.from(
+    new Set(
+      notes.flatMap((note) => note.tags || [])
+    )
+  ).sort();
+
+  // Filter notes by search query and selected tags
+  const filteredNotes = notes.filter((note) => {
+    const matchesSearch = note.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesTags = selectedTags.length === 0 || 
+      selectedTags.every(tag => note.tags?.includes(tag));
+    return matchesSearch && matchesTags;
+  });
 
   const folderlessNotes = filteredNotes.filter((note) => !note.folderId);
+
+  // Toggle tag selection
+  const toggleTag = (tag: string) => {
+    setSelectedTags(prev => 
+      prev.includes(tag) 
+        ? prev.filter(t => t !== tag)
+        : [...prev, tag]
+    );
+  };
+
+  // Clear all tag filters
+  const clearTagFilters = () => {
+    setSelectedTags([]);
+  };
 
   const handleCreateFolder = () => {
     if (newFolderName.trim()) {
@@ -546,7 +574,7 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
         </motion.div>
 
         {/* Fixed Header: Search Bar */}
-        <div className="flex-none px-4 pb-4">
+        <div className="flex-none px-4 pb-2">
           <div
             className="flex items-center gap-2 px-3 py-2 rounded-lg"
             style={{
@@ -565,6 +593,119 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
             />
           </div>
         </div>
+
+        {/* Tag Filter Panel */}
+        {allTags.length > 0 && (
+          <div className="flex-none px-4 pb-4">
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3, ease: 'easeInOut' }}
+              className="rounded-lg overflow-hidden"
+              style={{
+                backgroundColor: 'var(--color-bgTertiary)',
+                border: `1px solid var(--color-border)`,
+              }}
+            >
+              {/* Panel Header */}
+              <div
+                className="flex items-center justify-between px-3 py-2 cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => setShowTagPanel(!showTagPanel)}
+              >
+                <div className="flex items-center gap-2">
+                  <Tag size={16} style={{ color: 'var(--color-accent)' }} />
+                  <span className="text-xs font-semibold" style={{ color: 'var(--color-text)' }}>
+                    {t('filterByTags')} {selectedTags.length > 0 && `(${selectedTags.length})`}
+                  </span>
+                </div>
+                <motion.div
+                  animate={{ rotate: showTagPanel ? 180 : 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <ChevronDown size={16} style={{ color: 'var(--color-textSecondary)' }} />
+                </motion.div>
+              </div>
+
+              {/* Panel Content */}
+              <AnimatePresence>
+                {showTagPanel && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-3 pb-3 pt-1">
+                      {/* Clear Filters Button */}
+                      {selectedTags.length > 0 && (
+                        <motion.button
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={clearTagFilters}
+                          className="w-full mb-2 px-2 py-1.5 rounded-md text-xs font-medium flex items-center justify-center gap-1 transition-colors"
+                          style={{
+                            backgroundColor: 'var(--color-danger)',
+                            color: 'white',
+                          }}
+                        >
+                          <X size={14} />
+                          {t('clearFilters')}
+                        </motion.button>
+                      )}
+
+                      {/* Tags Grid */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {allTags.map((tag, index) => {
+                          const isSelected = selectedTags.includes(tag);
+                          const colorClass = getTagColor(tag);
+                          
+                          return (
+                            <motion.button
+                              key={tag}
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ 
+                                duration: 0.2, 
+                                delay: index * 0.03,
+                                ease: 'easeOut'
+                              }}
+                              whileHover={{ scale: 1.05, y: -2 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => toggleTag(tag)}
+                              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${colorClass}`}
+                              style={{
+                                opacity: isSelected ? 1 : 0.6,
+                                transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+                                boxShadow: isSelected 
+                                  ? '0 2px 8px rgba(0,0,0,0.15)' 
+                                  : '0 1px 3px rgba(0,0,0,0.1)',
+                                border: isSelected 
+                                  ? '2px solid currentColor' 
+                                  : '2px solid transparent',
+                              }}
+                            >
+                              {tag}
+                            </motion.button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Tag Count Info */}
+                      <div className="mt-2 text-xs text-center" style={{ color: 'var(--color-textSecondary)' }}>
+                        {allTags.length} {allTags.length !== 1 ? t('tagsAvailable') : t('tagAvailable')}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          </div>
+        )}
 
         {/* Scrollable Middle: Notes List */}
         <div className="flex-1 overflow-y-auto px-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-transparent">
