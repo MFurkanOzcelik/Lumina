@@ -24,6 +24,7 @@ const DraggableNote = ({ noteId, title, isActive, onClick, onDelete, onRename, o
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(title);
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
   
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: noteId,
@@ -45,6 +46,29 @@ const DraggableNote = ({ noteId, title, isActive, onClick, onDelete, onRename, o
       renameInputRef.current.select();
     }
   }, [isRenaming]);
+
+  // Handle keyboard shortcuts for active note
+  useEffect(() => {
+    if (!isActive) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Delete key - show delete confirmation
+      if (e.key === 'Delete' && !isRenaming) {
+        e.preventDefault();
+        setShowDeleteConfirm(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isActive, isRenaming]);
+
+  // Focus delete button when modal opens
+  useEffect(() => {
+    if (showDeleteConfirm && deleteButtonRef.current) {
+      deleteButtonRef.current.focus();
+    }
+  }, [showDeleteConfirm]);
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -165,6 +189,11 @@ const DraggableNote = ({ noteId, title, isActive, onClick, onDelete, onRename, o
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setShowDeleteConfirm(false)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setShowDeleteConfirm(false);
+                }
+              }}
               className="flex-1 px-4 py-3 rounded-xl font-semibold"
               style={{
                 backgroundColor: 'var(--color-bgTertiary)',
@@ -174,12 +203,19 @@ const DraggableNote = ({ noteId, title, isActive, onClick, onDelete, onRename, o
               İptal
             </motion.button>
             <motion.button
+              ref={deleteButtonRef}
               type="button"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => {
                 onDelete();
                 setShowDeleteConfirm(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  onDelete();
+                  setShowDeleteConfirm(false);
+                }
               }}
               className="flex-1 px-4 py-3 rounded-xl font-semibold"
               style={{
@@ -778,30 +814,50 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
                 {t('folders')}
               </h3>
               <div className="flex items-center gap-2">
-                {/* Create New Note Button - More Prominent */}
+                {/* Create New Note Button - Minimal */}
                 <motion.button
                   type="button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  whileTap={{ 
+                    scale: 0.9,
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.15)'
+                  }}
+                  transition={{ 
+                    type: 'spring',
+                    stiffness: 500,
+                    damping: 15
+                  }}
                   onClick={() => {
                     const newNoteId = createNote(null);
                     setActiveNote(newNoteId);
                   }}
-                  className="rounded-lg transition-all"
+                  className="flex items-center justify-center rounded-lg"
                   style={{ 
                     backgroundColor: 'var(--color-accent)',
                     color: 'white',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    width: '32px',
-                    height: '32px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: 0
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
+                    width: '24px',
+                    height: '24px',
+                    minWidth: '24px',
+                    minHeight: '24px',
+                    padding: 0,
+                    border: 'none',
+                    margin: 0,
+                    position: 'relative'
                   }}
                   title={t('createNewNote')}
                 >
-                  <Plus size={16} strokeWidth={2.5} style={{ display: 'block', flexShrink: 0 }} />
+                  <Plus 
+                    size={12} 
+                    strokeWidth={2.5} 
+                    style={{ 
+                      display: 'block', 
+                      flexShrink: 0,
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)'
+                    }} 
+                  />
                 </motion.button>
 
                 {/* Create Folder Button */}
