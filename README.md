@@ -1,4 +1,4 @@
-# 🌟 Lumina
+#  Lumina
 
 <div align="center">
 
@@ -16,43 +16,43 @@
 
 ---
 
-## ✨ Özellikler
+##  Özellikler
 
-### 📝 Zengin Metin Editörü
+###  Zengin Metin Editörü
 - **Biçimlendirme**: Bold, Italic, Underline, Strikethrough
 - **Listeler**: Madde işaretli ve numaralı listeler
 - **Font Boyutu**: Özelleştirilebilir metin boyutu
 - **Otomatik Kaydetme**: Değişiklikler anında kaydedilir
 
-### 📁 Güçlü Organizasyon
+###  Güçlü Organizasyon
 - **Klasör Yönetimi**: Notlarınızı klasörlerle organize edin
 - **Sürükle-Bırak**: Kolay yeniden düzenleme
 - **Arama**: Notlarınızı hızlıca bulun
 - **Sağ Tık Menüsü**: Yeniden adlandır, sil, taşı
 
-### 📄 PDF Desteği
+###  PDF Desteği
 - **PDF Görüntüleme**: PDF dosyalarını doğrudan uygulamada açın
 - **Tam Ekran**: Maksimize edilmiş okuma deneyimi
 - **İndirme**: PDF'leri kolayca indirin
 
-### 🎨 Modern Arayüz
+###  Modern Arayüz
 - **Açık/Koyu Tema**: Gözlerinize uygun tema seçin
 - **Kompakt Tasarım**: %75 ölçeklendirilmiş, verimli UI
 - **Menüsüz**: Temiz, dikkat dağıtmayan arayüz
 - **Responsive**: Her ekran boyutuna uyumlu
 
-### 🌍 Çoklu Dil
+###  Çoklu Dil
 - 🇹🇷 Türkçe
 - 🇬🇧 English
 
-### 💾 Güvenli Depolama
+###  Güvenli Depolama
 - **Yerel Veri**: Tüm veriler bilgisayarınızda
 - **IndexedDB**: Büyük dosyalar için optimize edilmiş
 - **Gizlilik**: Verileriniz sadece sizde
 
 ---
 
-## 📥 İndirme
+##  İndirme
 
 ### Windows
 
@@ -69,7 +69,7 @@
 
 ---
 
-## 🚀 Kurulum
+##  Kurulum
 
 ### Yöntem 1: Kurulum Programı (Önerilen)
 
@@ -88,7 +88,7 @@
 
 ---
 
-## 💡 Kullanım
+##  Kullanım
 
 ### İlk Adımlar
 
@@ -125,7 +125,7 @@ Not veya klasöre sağ tıklayarak:
 
 ---
 
-## 🛠️ Geliştirme
+##  Geliştirme
 
 ### Kurulum
 
@@ -169,7 +169,7 @@ npm run electron:build:linux
 
 ---
 
-## 📂 Proje Yapısı
+##  Proje Yapısı
 
 ```
 lumina/
@@ -188,13 +188,13 @@ lumina/
 
 ---
 
-## 🐛 Hata Bildirimi
+##  Hata Bildirimi
 
 Bir hata mı buldunuz? [Issue açın](https://github.com/MFurkanOzcelik/Lumina/issues)
 
 ---
 
-## 🤝 Katkıda Bulunma
+##  Katkıda Bulunma
 
 Katkılarınızı bekliyoruz!
 
@@ -206,13 +206,13 @@ Katkılarınızı bekliyoruz!
 
 ---
 
-## 📄 Lisans
+##  Lisans
 
 Bu proje [MIT License](LICENSE) altında lisanslanmıştır.
 
 ---
 
-## 🙏 Teşekkürler
+##  Teşekkürler
 
 - [Electron](https://www.electronjs.org/)
 - [React](https://reactjs.org/)
@@ -224,7 +224,7 @@ Bu proje [MIT License](LICENSE) altında lisanslanmıştır.
 
 <div align="center">
 
-**Lumina ile notlarınızı daha verimli yönetin!** ✨
+**Lumina ile notlarınızı daha verimli yönetin!** 
 
 Made with ❤️ by Lumina Team
 
