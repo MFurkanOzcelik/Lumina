@@ -787,15 +787,21 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
                     const newNoteId = createNote(null);
                     setActiveNote(newNoteId);
                   }}
-                  className="p-1.5 rounded-lg transition-all flex items-center justify-center"
+                  className="rounded-lg transition-all"
                   style={{ 
                     backgroundColor: 'var(--color-accent)',
                     color: 'white',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0
                   }}
                   title={t('createNewNote')}
                 >
-                  <Plus size={16} strokeWidth={2.5} style={{ display: 'block' }} />
+                  <Plus size={16} strokeWidth={2.5} style={{ display: 'block', flexShrink: 0 }} />
                 </motion.button>
 
                 {/* Create Folder Button */}
