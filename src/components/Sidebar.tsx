@@ -600,8 +600,8 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
           <img 
             src="./logo.png" 
             alt="Lumina Logo" 
-            className="w-10 h-10 flex-shrink-0 object-contain" 
-            style={{ minWidth: '40px', minHeight: '40px' }}
+            className="w-14 h-14 flex-shrink-0 object-contain" 
+            style={{ minWidth: '56px', minHeight: '56px' }}
             onError={(e) => {
               // Fallback if image fails to load
               e.currentTarget.style.display = 'none';
