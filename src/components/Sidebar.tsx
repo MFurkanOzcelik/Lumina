@@ -573,7 +573,15 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
           />
           <span 
             className="text-2xl font-bold tracking-tight"
-            style={{ color: 'var(--color-text)' }}
+            style={{ 
+              color: 'var(--color-text)',
+              marginLeft: '20px',
+              marginRight: '20px',
+              boxSizing: 'content-box',
+              letterSpacing: '0.2px',
+              verticalAlign: 'bottom',
+              textAlign: 'left'
+            }}
           >
             Lumina
           </span>
