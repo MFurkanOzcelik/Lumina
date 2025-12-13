@@ -86,13 +86,16 @@ function App() {
         }
         
         // Create a new note with the imported content
-        const newNoteId = createNote(noteTitle);
+        const newNoteId = createNote(null);
         
-        // Update the note content
+        // Update the note with title and content
         // We need to wait a bit for the note to be created
         setTimeout(() => {
           const notesStore = useNotesStore.getState();
-          notesStore.updateNote(newNoteId, { content: noteContent });
+          notesStore.updateNote(newNoteId, { 
+            title: noteTitle,
+            content: noteContent 
+          });
           setActiveNote(newNoteId);
         }, 100);
       });

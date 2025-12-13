@@ -50,12 +50,6 @@
       "icon": "public/logo.png",
       "category": "Office"
     },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
-    },
     "fileAssociations": [
       {
         "ext": "lum",
@@ -64,7 +58,13 @@
         "role": "Editor",
         "icon": "public/logo.ico"
       }
-    ]
+    ],
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",
