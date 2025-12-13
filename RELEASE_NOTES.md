@@ -71,6 +71,8 @@ Welcome to the new version of Lumina! This update brings powerful organization t
 
 ## 🐛 Bug Fixes
 
+- **Fixed file import bug**: Corrected `createNote()` function call to properly handle imported file titles
+- **Fixed file association**: Moved `fileAssociations` configuration to correct level in build config, ensuring `.lum` files are properly associated with Lumina
 - Fixed editor scrolling issues
 - Resolved sidebar rendering problems
 - Fixed context menu positioning errors
