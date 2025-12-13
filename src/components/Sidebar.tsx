@@ -384,6 +384,7 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
   const [moveNoteId, setMoveNoteId] = useState<string | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showTagPanel, setShowTagPanel] = useState(true);
+  const [tagSearchQuery, setTagSearchQuery] = useState('');
 
   const { notes, folders, activeNoteId, setActiveNote, deleteNote, updateNote, createFolder, updateFolder, deleteFolder, moveNoteToFolder } =
     useNotesStore();
@@ -487,6 +488,11 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
       notes.flatMap((note) => note.tags || [])
     )
   ).sort();
+
+  // Filter tags based on tag search query
+  const filteredTags = allTags.filter((tag) =>
+    tag.toLowerCase().includes(tagSearchQuery.toLowerCase())
+  );
 
   // Filter notes by search query and selected tags
   const filteredNotes = notes.filter((note) => {
@@ -638,6 +644,38 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
                     className="overflow-hidden"
                   >
                     <div className="px-3 pb-3 pt-1">
+                      {/* Tag Search Bar */}
+                      <div className="mb-2">
+                        <div
+                          className="flex items-center gap-2 px-2 py-1.5 rounded-md"
+                          style={{
+                            backgroundColor: 'var(--color-bg)',
+                            border: `1px solid var(--color-border)`,
+                          }}
+                        >
+                          <Search size={14} style={{ color: 'var(--color-textSecondary)' }} />
+                          <input
+                            type="text"
+                            placeholder="Search tags..."
+                            value={tagSearchQuery}
+                            onChange={(e) => setTagSearchQuery(e.target.value)}
+                            className="flex-1 bg-transparent outline-none text-xs"
+                            style={{ color: 'var(--color-text)' }}
+                          />
+                          {tagSearchQuery && (
+                            <motion.button
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              onClick={() => setTagSearchQuery('')}
+                              className="p-0.5 rounded hover:bg-opacity-20"
+                              style={{ color: 'var(--color-textSecondary)' }}
+                            >
+                              <X size={12} />
+                            </motion.button>
+                          )}
+                        </div>
+                      </div>
+
                       {/* Clear Filters Button */}
                       {selectedTags.length > 0 && (
                         <motion.button
@@ -660,7 +698,7 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
 
                       {/* Tags Grid */}
                       <div className="flex flex-wrap gap-1.5">
-                        {allTags.map((tag, index) => {
+                        {filteredTags.map((tag, index) => {
                           const isSelected = selectedTags.includes(tag);
                           const colorClass = getTagColor(tag);
                           
@@ -668,25 +706,29 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
                             <motion.button
                               key={tag}
                               initial={{ opacity: 0, scale: 0.8 }}
-                              animate={{ opacity: 1, scale: 1 }}
+                              animate={{ 
+                                opacity: 1, 
+                                scale: isSelected ? 1.05 : 1,
+                              }}
                               transition={{ 
                                 duration: 0.2, 
                                 delay: index * 0.03,
                                 ease: 'easeOut'
                               }}
-                              whileHover={{ scale: 1.05, y: -2 }}
+                              whileHover={{ scale: isSelected ? 1.08 : 1.05, y: -2 }}
                               whileTap={{ scale: 0.95 }}
                               onClick={() => toggleTag(tag)}
-                              className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${colorClass}`}
+                              className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all ${colorClass}`}
                               style={{
-                                opacity: isSelected ? 1 : 0.6,
-                                transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+                                opacity: isSelected ? 1 : 0.5,
                                 boxShadow: isSelected 
-                                  ? '0 2px 8px rgba(0,0,0,0.15)' 
+                                  ? '0 4px 12px rgba(0,0,0,0.25), inset 0 0 0 2px currentColor' 
                                   : '0 1px 3px rgba(0,0,0,0.1)',
                                 border: isSelected 
                                   ? '2px solid currentColor' 
                                   : '2px solid transparent',
+                                filter: isSelected ? 'brightness(1.1) saturate(1.3)' : 'brightness(0.9) saturate(0.8)',
+                                fontWeight: isSelected ? '700' : '500',
                               }}
                             >
                               {tag}
@@ -697,7 +739,16 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
 
                       {/* Tag Count Info */}
                       <div className="mt-2 text-xs text-center" style={{ color: 'var(--color-textSecondary)' }}>
-                        {allTags.length} {allTags.length !== 1 ? t('tagsAvailable') : t('tagAvailable')}
+                        {filteredTags.length > 0 ? (
+                          <>
+                            {filteredTags.length} {filteredTags.length !== 1 ? t('tagsAvailable') : t('tagAvailable')}
+                            {tagSearchQuery && filteredTags.length !== allTags.length && (
+                              <span className="opacity-70"> (of {allTags.length})</span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="opacity-70">No tags found</span>
+                        )}
                       </div>
                     </div>
                   </motion.div>
