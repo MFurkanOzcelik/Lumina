@@ -33,6 +33,14 @@ function createWindow() {
       contextIsolation: true, // Security: isolate context
     },
     autoHideMenuBar: true, // Üstteki dosya/düzen menüsünü gizler
+    fullscreen: false, // Don't start in fullscreen mode
+    show: false, // Don't show until ready
+  })
+
+  // Maximize window when ready to show
+  win.once('ready-to-show', () => {
+    win?.maximize()
+    win?.show()
   })
 
   // Geliştirme ortamındaysan localhost'u, build alındıysa html dosyasını yükle
