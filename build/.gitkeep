@@ -1,0 +1,4 @@
+# This file ensures the build directory is tracked by git
+# Icon files (*.png, *.ico, *.icns) are typically not committed to git
+# Users should generate them locally using the provided scripts and instructions
+

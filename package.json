@@ -32,14 +32,14 @@
         "nsis",
         "portable"
       ],
-      "icon": "public/logo.ico"
+      "icon": "build/icon.png"
     },
     "mac": {
       "target": [
         "dmg",
         "zip"
       ],
-      "icon": "public/logo.png",
+      "icon": "build/icon.png",
       "category": "public.app-category.productivity"
     },
     "linux": {
@@ -47,7 +47,7 @@
         "AppImage",
         "deb"
       ],
-      "icon": "public/logo.png",
+      "icon": "build/icon.png",
       "category": "Office"
     },
     "fileAssociations": [
@@ -56,7 +56,7 @@
         "name": "Lumina Note",
         "description": "Lumina Note File",
         "role": "Editor",
-        "icon": "public/logo.ico"
+        "icon": "build/document-icon.png"
       }
     ],
     "nsis": {
