@@ -13,8 +13,11 @@ dist-ssr
 *.local
 
 # Electron
-release
-*.exe
+release/*.blockmap
+release/*.yaml
+release/*.yml
+release/win-unpacked
+release/__uninstaller-nsis-lumina.exe
 *.dmg
 *.AppImage
 *.deb
