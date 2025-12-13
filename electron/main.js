@@ -1,7 +1,14 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { autoUpdater } = require('electron-updater');
+const log = require('electron-log');
 const isDev = process.env.NODE_ENV === 'development';
+
+// Configure logging for auto-updater
+autoUpdater.logger = log;
+autoUpdater.logger.transports.file.level = 'info';
+log.info('App starting...');
 
 let mainWindow;
 let fileToOpen = null;
@@ -129,6 +136,47 @@ function readAndSendFile(filePath) {
   }
 }
 
+// Auto-updater event handlers
+autoUpdater.on('checking-for-update', () => {
+  log.info('Checking for update...');
+});
+
+autoUpdater.on('update-available', (info) => {
+  log.info('Update available:', info);
+  if (mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send('update-available', info);
+  }
+});
+
+autoUpdater.on('update-not-available', (info) => {
+  log.info('Update not available:', info);
+});
+
+autoUpdater.on('error', (err) => {
+  log.error('Error in auto-updater:', err);
+  if (mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send('update-error', err.message);
+  }
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+  let logMessage = `Download speed: ${progressObj.bytesPerSecond}`;
+  logMessage = `${logMessage} - Downloaded ${progressObj.percent}%`;
+  logMessage = `${logMessage} (${progressObj.transferred}/${progressObj.total})`;
+  log.info(logMessage);
+  
+  if (mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send('download-progress', progressObj);
+  }
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  log.info('Update downloaded:', info);
+  if (mainWindow && mainWindow.webContents) {
+    mainWindow.webContents.send('update-downloaded', info);
+  }
+});
+
 // App lifecycle
 app.whenReady().then(() => {
   createWindow();
@@ -141,6 +189,14 @@ app.whenReady().then(() => {
         fileToOpen = null;
       }, 1000); // Wait for React to initialize
     });
+  }
+
+  // Check for updates (only in production)
+  if (!isDev) {
+    // Wait a bit for the window to load before checking for updates
+    setTimeout(() => {
+      autoUpdater.checkForUpdatesAndNotify();
+    }, 3000);
   }
 
   app.on('activate', () => {
@@ -163,5 +219,107 @@ ipcMain.handle('get-app-version', () => {
 
 ipcMain.handle('get-app-path', () => {
   return app.getPath('userData');
+});
+
+// Handle update installation
+ipcMain.handle('install-update', () => {
+  log.info('User requested to install update');
+  autoUpdater.quitAndInstall(false, true);
+});
+
+// Storage IPC handlers
+const userDataPath = app.getPath('userData');
+const notesPath = path.join(userDataPath, 'notes.json');
+const foldersPath = path.join(userDataPath, 'folders.json');
+const settingsPath = path.join(userDataPath, 'settings.json');
+
+// Ensure user data directory exists
+if (!fs.existsSync(userDataPath)) {
+  fs.mkdirSync(userDataPath, { recursive: true });
+}
+
+ipcMain.handle('storage:getNotes', async () => {
+  try {
+    if (fs.existsSync(notesPath)) {
+      const data = fs.readFileSync(notesPath, 'utf-8');
+      return JSON.parse(data);
+    }
+    return [];
+  } catch (error) {
+    log.error('Error reading notes:', error);
+    return [];
+  }
+});
+
+ipcMain.handle('storage:saveNotes', async (event, notes) => {
+  try {
+    fs.writeFileSync(notesPath, JSON.stringify(notes, null, 2), 'utf-8');
+    return true;
+  } catch (error) {
+    log.error('Error saving notes:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('storage:getFolders', async () => {
+  try {
+    if (fs.existsSync(foldersPath)) {
+      const data = fs.readFileSync(foldersPath, 'utf-8');
+      return JSON.parse(data);
+    }
+    return [];
+  } catch (error) {
+    log.error('Error reading folders:', error);
+    return [];
+  }
+});
+
+ipcMain.handle('storage:saveFolders', async (event, folders) => {
+  try {
+    fs.writeFileSync(foldersPath, JSON.stringify(folders, null, 2), 'utf-8');
+    return true;
+  } catch (error) {
+    log.error('Error saving folders:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('storage:getSettings', async () => {
+  try {
+    if (fs.existsSync(settingsPath)) {
+      const data = fs.readFileSync(settingsPath, 'utf-8');
+      return JSON.parse(data);
+    }
+    return {};
+  } catch (error) {
+    log.error('Error reading settings:', error);
+    return {};
+  }
+});
+
+ipcMain.handle('storage:saveSettings', async (event, settings) => {
+  try {
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+    return true;
+  } catch (error) {
+    log.error('Error saving settings:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('storage:clearAll', async () => {
+  try {
+    if (fs.existsSync(notesPath)) fs.unlinkSync(notesPath);
+    if (fs.existsSync(foldersPath)) fs.unlinkSync(foldersPath);
+    if (fs.existsSync(settingsPath)) fs.unlinkSync(settingsPath);
+    return true;
+  } catch (error) {
+    log.error('Error clearing storage:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('storage:getUserDataPath', async () => {
+  return userDataPath;
 });
 

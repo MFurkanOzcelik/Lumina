@@ -5,6 +5,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { Sidebar } from './components/Sidebar';
 import { HomePage } from './components/HomePage';
 import { Editor } from './components/Editor';
+import { UpdateNotification } from './components/UpdateNotification';
 import { useSettingsStore } from './store/useSettingsStore';
 import { useNotesStore } from './store/useNotesStore';
 import { applyTheme } from './utils/themes';
@@ -215,6 +216,7 @@ function App() {
       </motion.div>
 
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      <UpdateNotification />
     </div>
   );
 }

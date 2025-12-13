@@ -50,6 +50,10 @@ export const translations = {
     clearFilters: 'Clear Filters',
     tagsAvailable: 'tags available',
     tagAvailable: 'tag available',
+    downloadingUpdate: 'Downloading Update...',
+    updateReady: 'Update Ready!',
+    updateReadyDescription: 'Restart to install the latest version',
+    restartToUpdate: 'Restart to Update',
   },
   tr: {
     welcome: 'Hoşgeldiniz',
@@ -100,6 +104,10 @@ export const translations = {
     clearFilters: 'Filtreleri Temizle',
     tagsAvailable: 'etiket mevcut',
     tagAvailable: 'etiket mevcut',
+    downloadingUpdate: 'Güncelleme İndiriliyor...',
+    updateReady: 'Güncelleme Hazır!',
+    updateReadyDescription: 'En son sürümü yüklemek için yeniden başlatın',
+    restartToUpdate: 'Güncellemek İçin Yeniden Başlat',
   },
 };
 
