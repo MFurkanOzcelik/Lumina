@@ -10,7 +10,7 @@
 [![Windows](https://img.shields.io/badge/Platform-Windows-blue.svg)](https://www.microsoft.com/windows)
 [![Version](https://img.shields.io/badge/Version-1.0.0-green.svg)](https://github.com/yourusername/lumina/releases)
 
-[İndir](#-indirme) • [Özellikler](#-özellikler) • [Kurulum](#-kurulum) • [Kullanım](#-kullanım)
+[İndir](https://github.com/MFurkanOzcelik/Lumina/releases) • [Özellikler](#-özellikler) • [Kurulum](#-kurulum) • [Kullanım](#-kullanım)
 
 </div>
 
@@ -58,8 +58,8 @@
 
 | Dosya | Boyut | Açıklama |
 |-------|-------|----------|
-| [**Lumina Setup 1.0.0.exe**](https://github.com/yourusername/lumina/releases/download/v1.0.0/Lumina.Setup.1.0.0.exe) | 94.87 MB | Kurulum programı (Önerilen) |
-| [**Lumina 1.0.0.exe**](https://github.com/yourusername/lumina/releases/download/v1.0.0/Lumina.1.0.0.exe) | 94.62 MB | Portable sürüm |
+| [**Lumina Setup 1.0.0.exe**](https://github.com/MFurkanOzcelik/Lumina/releases/latest) | 94.87 MB | Kurulum programı (Önerilen) |
+| [**Lumina 1.0.0.exe**](https://github.com/MFurkanOzcelik/Lumina/releases/latest) | 94.62 MB | Portable sürüm |
 
 ### Sistem Gereksinimleri
 
@@ -190,7 +190,7 @@ lumina/
 
 ## 🐛 Hata Bildirimi
 
-Bir hata mı buldunuz? [Issue açın](https://github.com/yourusername/lumina/issues)
+Bir hata mı buldunuz? [Issue açın](https://github.com/MFurkanOzcelik/Lumina/issues)
 
 ---
 
