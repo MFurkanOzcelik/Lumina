@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, FolderPlus, Trash2, ChevronRight, ChevronDown, FileText, ChevronLeft, GripVertical, Settings, Tag, X } from 'lucide-react';
+import { Search, FolderPlus, Trash2, ChevronRight, ChevronDown, FileText, ChevronLeft, GripVertical, Settings, Tag, X, Plus } from 'lucide-react';
 import { useNotesStore } from '../store/useNotesStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useTranslation } from '../utils/translations';
@@ -386,7 +386,7 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
   const [showTagPanel, setShowTagPanel] = useState(true);
   const [tagSearchQuery, setTagSearchQuery] = useState('');
 
-  const { notes, folders, activeNoteId, setActiveNote, deleteNote, updateNote, createFolder, updateFolder, deleteFolder, moveNoteToFolder } =
+  const { notes, folders, activeNoteId, setActiveNote, deleteNote, updateNote, createNote, createFolder, updateFolder, deleteFolder, moveNoteToFolder } =
     useNotesStore();
   const { setSidebarCollapsed } = useSettingsStore();
   const language = useSettingsStore((state) => state.language);
@@ -778,17 +778,57 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
                 {t('folders')}
               </h3>
               <div className="flex items-center gap-2">
+                {/* Create New Note Button - More Prominent */}
                 <motion.button
                   type="button"
-                  whileHover={{ scale: 1.1 }}
+                  whileHover={{ 
+                    scale: 1.15,
+                    rotate: 90,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+                  }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => createNote(null)}
+                  className="p-2 rounded-lg transition-all"
+                  style={{ 
+                    backgroundColor: 'var(--color-accent)',
+                    color: 'white',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }}
+                  title={t('createNewNote')}
+                  transition={{ 
+                    type: 'spring',
+                    stiffness: 400,
+                    damping: 17
+                  }}
+                >
+                  <Plus size={18} strokeWidth={2.5} />
+                </motion.button>
+
+                {/* Create Folder Button */}
+                <motion.button
+                  type="button"
+                  whileHover={{ 
+                    scale: 1.1,
+                    backgroundColor: 'var(--color-bgTertiary)'
+                  }}
                   whileTap={{ scale: 0.9 }}
                   onClick={() => setShowFolderInput(!showFolderInput)}
-                  className="p-1 rounded"
-                  style={{ color: 'var(--color-accent)' }}
+                  className="p-1.5 rounded-lg transition-all"
+                  style={{ 
+                    color: 'var(--color-accent)',
+                    backgroundColor: 'transparent'
+                  }}
                   title={t('createFolder')}
+                  transition={{ 
+                    type: 'spring',
+                    stiffness: 400,
+                    damping: 17
+                  }}
                 >
                   <FolderPlus size={16} />
                 </motion.button>
+
+                {/* Close Sidebar Button */}
                 <motion.button
                   type="button"
                   whileHover={{ 
