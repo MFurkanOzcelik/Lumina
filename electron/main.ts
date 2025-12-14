@@ -23,10 +23,16 @@ if (!fs.existsSync(USER_DATA_PATH)) {
 console.log('User data will be stored in:', USER_DATA_PATH)
 
 function createWindow() {
+  // Use high-resolution .ico file for Windows taskbar and desktop
+  // In production, files are in VITE_PUBLIC (which points to dist or public)
+  const iconPath = process.platform === 'win32' 
+    ? path.join(process.env.VITE_PUBLIC || '', 'icon.ico')
+    : path.join(process.env.VITE_PUBLIC || '', 'logo.png')
+  
   win = new BrowserWindow({
     width: 1200,
     height: 800,
-    icon: path.join(process.env.VITE_PUBLIC, 'logo.png'), // Logo dosyan burada önemli
+    icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -47,7 +53,7 @@ function createWindow() {
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
   } else {
-    win.loadFile(path.join(process.env.DIST, 'index.html'))
+    win.loadFile(path.join(process.env.DIST || '', 'index.html'))
   }
 }
 

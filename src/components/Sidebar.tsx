@@ -594,29 +594,22 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
           onClick={() => setActiveNote(null)}
-          className="flex-none flex items-center cursor-pointer hover:opacity-80 transition-all p-6 rounded-xl gap-4"
+          className="flex-none flex items-center cursor-pointer hover:opacity-80 transition-all px-4 py-4 gap-3"
           title="Ana Sayfaya Dön"
         >
           <img 
             src="./logo.png" 
             alt="Lumina Logo" 
-            className="w-14 h-14 flex-shrink-0 object-contain" 
-            style={{ minWidth: '56px', minHeight: '56px' }}
+            className="w-9 h-9 flex-shrink-0 object-contain" 
             onError={(e) => {
               // Fallback if image fails to load
               e.currentTarget.style.display = 'none';
             }}
           />
           <span 
-            className="text-2xl font-bold tracking-tight"
+            className="text-lg font-bold tracking-tight"
             style={{ 
               color: 'var(--color-text)',
-              marginLeft: '20px',
-              marginRight: '20px',
-              boxSizing: 'content-box',
-              letterSpacing: '0.2px',
-              verticalAlign: 'bottom',
-              textAlign: 'left'
             }}
           >
             Lumina
