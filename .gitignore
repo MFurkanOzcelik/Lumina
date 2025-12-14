@@ -13,11 +13,8 @@ dist-ssr
 *.local
 
 # Electron
-release/*.blockmap
-release/*.yaml
-release/*.yml
-release/win-unpacked
-release/__uninstaller-nsis-lumina.exe
+release/
+*.exe
 *.dmg
 *.AppImage
 *.deb
@@ -40,7 +37,7 @@ release/__uninstaller-nsis-lumina.exe
 *.vbs
 *.sh
 
-# Documentation (keep only README, LICENSE, KURULUM, NASIL_KULLANILIR)
+# Documentation (keep only README, LICENSE, KURULUM, NASIL_KULLANILIR, RELEASE_NOTES)
 ARCHITECTURE.md
 CHECKLIST.md
 CURSOR_AND_FILE_FEATURES.md
@@ -70,3 +67,12 @@ SETUP.md
 START_HERE.md
 STORAGE_API_REFERENCE.md
 VISUAL_GUIDE.md
+AUTO_UPDATE_GUIDE.md
+DATA_PERSISTENCE_GUIDE.md
+ICON_UPDATE_COMPLETE.md
+ICON_UPDATE_INSTRUCTIONS.md
+RELEASE_NOTES_v1.1.0.md
+RELEASE_NOTES_v1.2.0.md
+
+# Build artifacts
+release/.icon-ico/

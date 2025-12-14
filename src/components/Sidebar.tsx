@@ -10,6 +10,7 @@ import { ContextMenu } from './ContextMenu';
 import { MoveFolderModal } from './MoveFolderModal';
 import TurndownService from 'turndown';
 import { getTagColor } from '../utils/tagUtils';
+import './Sidebar.css';
 
 interface SidebarProps {
   width: number;
@@ -594,7 +595,7 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
           onClick={() => setActiveNote(null)}
-          className="flex-none flex items-center cursor-pointer hover:opacity-80 transition-all px-4 py-4 gap-3"
+          className="sidebar-logo-container flex-none flex items-center cursor-pointer hover:opacity-80 transition-all px-4 py-4 gap-3"
           title="Ana Sayfaya Dön"
         >
           <img 

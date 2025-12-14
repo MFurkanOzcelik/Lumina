@@ -1,0 +1,28 @@
+/* Sidebar Logo Section Styles */
+
+/* Logo container - the motion.div wrapper */
+.sidebar-logo-container {
+  /* Container styles are handled by Tailwind classes */
+}
+
+/* Logo image styles */
+.sidebar-logo-container img.w-9 {
+  margin-left: 50px;
+  width: 20px !important;
+  height: 20px !important;
+  padding: 0 !important;
+}
+
+/* Logo text styles */
+.sidebar-logo-container span.text-lg {
+  margin-left: 10px;
+  margin-right: 0px;
+  letter-spacing: 0px;
+  text-align: center;
+  vertical-align: middle;
+  width: 84px;
+  font-size: 20px;
+  font-family: Georgia, serif;
+  font-weight: 900;
+}
+
