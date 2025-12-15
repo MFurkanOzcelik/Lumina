@@ -88,6 +88,23 @@ function createWindow() {
     }
   });
 
+  // F12 key handler for fullscreen toggle
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown') {
+      // F12 - Toggle fullscreen
+      if (input.key === 'F12') {
+        const isFullScreen = mainWindow.isFullScreen();
+        mainWindow.setFullScreen(!isFullScreen);
+        event.preventDefault();
+      }
+      // ESC - Exit fullscreen
+      else if (input.key === 'Escape' && mainWindow.isFullScreen()) {
+        mainWindow.setFullScreen(false);
+        // Don't prevent default to allow other ESC handlers
+      }
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
