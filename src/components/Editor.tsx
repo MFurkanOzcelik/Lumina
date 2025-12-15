@@ -23,6 +23,7 @@ import { useTranslation } from '../utils/translations';
 import { Modal } from './Modal';
 import { Toast } from './Toast';
 import { TagInput } from './TagInput';
+import { ExportModal } from './ExportModal';
 import TurndownService from 'turndown';
 import hljs from 'highlight.js/lib/core';
 import javascript from 'highlight.js/lib/languages/javascript';
@@ -55,6 +56,7 @@ export const Editor = () => {
   const [tags, setTags] = useState<string[]>([]);
   const [showSaved, setShowSaved] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [showFontSize, setShowFontSize] = useState(false);
   const [currentFontSize, setCurrentFontSize] = useState(16);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
@@ -209,8 +211,8 @@ export const Editor = () => {
     updateNote(activeNoteId, { tags: updatedTags });
   };
 
-  // Export note as Markdown
-  const handleExportNote = () => {
+  // Export note as .lum (Markdown)
+  const handleExportAsLum = () => {
     if (!activeNote) return;
     
     // Initialize Turndown service
@@ -258,6 +260,29 @@ export const Editor = () => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  // Export note as PDF
+  const handleExportAsPdf = async () => {
+    if (!activeNote || !window.electronAPI?.exportToPdf) return;
+
+    try {
+      const result = await window.electronAPI.exportToPdf(content, title || 'Untitled Note');
+      
+      if (result.success) {
+        setShowSaved(true);
+        setTimeout(() => setShowSaved(false), 2000);
+      } else if (!result.canceled) {
+        console.error('PDF export failed:', result.error);
+      }
+    } catch (error) {
+      console.error('Error exporting to PDF:', error);
+    }
+  };
+
+  // Open export modal
+  const handleExportNote = () => {
+    setShowExportModal(true);
   };
 
   const execCommand = (command: string, value?: string) => {
@@ -1768,6 +1793,15 @@ export const Editor = () => {
           </div>
         </div>
       </Modal>
+
+      {/* Export Modal */}
+      <ExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        onExportLum={handleExportAsLum}
+        onExportPdf={handleExportAsPdf}
+        noteTitle={title}
+      />
     </>
   );
 };
