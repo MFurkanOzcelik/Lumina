@@ -28,8 +28,11 @@ export interface ElectronAPI {
   platform: string;
   isElectron: boolean;
   storage: ElectronStorage;
+  // File opening
   onOpenLumFile?: (callback: (data: { fileName: string; content: string; filePath: string }) => void) => void;
+  onOpenExternalFile?: (callback: (data: { fileName: string; content: string; filePath: string; fileType: string }) => void) => void;
   removeOpenLumFileListener?: () => void;
+  removeOpenExternalFileListener?: () => void;
   // Auto-updater
   onUpdateAvailable?: (callback: (info: UpdateInfo) => void) => void;
   onUpdateDownloaded?: (callback: (info: UpdateInfo) => void) => void;

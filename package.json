@@ -57,13 +57,36 @@
         "description": "Lumina Note File",
         "role": "Editor",
         "icon": "build/document-icon.ico"
+      },
+      {
+        "ext": "txt",
+        "name": "Text Document",
+        "description": "Plain Text File",
+        "role": "Editor",
+        "icon": "build/document-icon.ico"
+      },
+      {
+        "ext": "md",
+        "name": "Markdown Document",
+        "description": "Markdown File",
+        "role": "Editor",
+        "icon": "build/document-icon.ico"
+      },
+      {
+        "ext": "json",
+        "name": "JSON Document",
+        "description": "JSON File",
+        "role": "Editor",
+        "icon": "build/document-icon.ico"
       }
     ],
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "perMachine": false,
+      "include": "build/installer.nsh"
     },
     "publish": {
       "provider": "github",

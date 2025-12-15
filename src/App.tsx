@@ -104,6 +104,66 @@ function App() {
     }
   }, [createNote, setActiveNote]);
 
+  // Handle external file opening (txt, md, json) from "Open with Lumina"
+  useEffect(() => {
+    if (window.electronAPI?.onOpenExternalFile) {
+      window.electronAPI.onOpenExternalFile((data) => {
+        const { fileName, content, fileType } = data;
+        
+        console.log('Opening external file:', fileName, fileType);
+        
+        // Parse content based on file type
+        let noteContent = content;
+        let noteTitle = fileName;
+        
+        // For markdown files, try to extract title
+        if (fileType === '.md') {
+          const titleMatch = content.match(/^#\s+(.+)\n/);
+          if (titleMatch) {
+            noteTitle = titleMatch[1];
+            noteContent = content.substring(titleMatch[0].length).trim();
+          }
+        }
+        
+        // For JSON files, try to format nicely
+        if (fileType === '.json') {
+          try {
+            const parsed = JSON.parse(content);
+            noteContent = `<pre><code>${JSON.stringify(parsed, null, 2)}</code></pre>`;
+          } catch (e) {
+            // If parsing fails, use raw content
+            noteContent = `<pre><code>${content}</code></pre>`;
+          }
+        }
+        
+        // For plain text, wrap in paragraph
+        if (fileType === '.txt') {
+          // Convert line breaks to HTML
+          noteContent = content.split('\n').map(line => `<p>${line || '<br>'}</p>`).join('');
+        }
+        
+        // Create a new note with the imported content
+        const newNoteId = createNote(null);
+        
+        // Update the note with title and content
+        setTimeout(() => {
+          const notesStore = useNotesStore.getState();
+          notesStore.updateNote(newNoteId, { 
+            title: noteTitle,
+            content: noteContent 
+          });
+          setActiveNote(newNoteId);
+        }, 100);
+      });
+      
+      return () => {
+        if (window.electronAPI?.removeOpenExternalFileListener) {
+          window.electronAPI.removeOpenExternalFileListener();
+        }
+      };
+    }
+  }, [createNote, setActiveNote]);
+
 
   // Show loading screen while initializing
   if (isInitializing || !settingsHydrated || !notesHydrated) {

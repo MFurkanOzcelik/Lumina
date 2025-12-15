@@ -112,18 +112,29 @@ function createWindow() {
 
 // Handle file opening on Windows/Linux (when app is not running)
 if (process.platform === 'win32' || process.platform === 'linux') {
-  // Check if a .lum file was passed as argument
-  const filePath = process.argv.find(arg => arg.endsWith('.lum'));
-  if (filePath && fs.existsSync(filePath)) {
-    fileToOpen = filePath;
+  // Check if any supported file was passed as argument
+  // Skip electron executable and script paths
+  const supportedExtensions = ['.lum', '.txt', '.md', '.json'];
+  const filePath = process.argv.slice(1).find(arg => {
+    const ext = path.extname(arg).toLowerCase();
+    return supportedExtensions.includes(ext) && fs.existsSync(arg);
+  });
+  
+  if (filePath) {
+    fileToOpen = path.resolve(filePath);
+    log.info('File to open on startup:', fileToOpen);
   }
 }
 
 // Handle file opening on macOS (open-file event)
 app.on('open-file', (event, filePath) => {
   event.preventDefault();
-  if (filePath.endsWith('.lum')) {
+  const supportedExtensions = ['.lum', '.txt', '.md', '.json'];
+  const ext = path.extname(filePath).toLowerCase();
+  
+  if (supportedExtensions.includes(ext)) {
     fileToOpen = filePath;
+    log.info('File opened via open-file event:', filePath);
     if (mainWindow) {
       // If window is already open, send the file content
       readAndSendFile(filePath);
@@ -135,21 +146,26 @@ app.on('open-file', (event, filePath) => {
 function readAndSendFile(filePath) {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
-    const fileName = path.basename(filePath, '.lum');
+    const ext = path.extname(filePath);
+    const fileName = path.basename(filePath, ext);
     
     if (mainWindow && mainWindow.webContents) {
-      mainWindow.webContents.send('open-lum-file', {
+      mainWindow.webContents.send('open-external-file', {
         fileName,
         content,
-        filePath
+        filePath,
+        fileType: ext.toLowerCase()
       });
       
       // Focus the window
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
+      
+      log.info('File sent to renderer:', filePath);
     }
   } catch (error) {
-    console.error('Error reading .lum file:', error);
+    log.error('Error reading file:', error);
+    console.error('Error reading file:', error);
   }
 }
 

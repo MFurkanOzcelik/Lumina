@@ -8,13 +8,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
   isElectron: true,
   
-  // Listen for file open events
+  // Listen for file open events (legacy .lum files)
   onOpenLumFile: (callback) => {
     ipcRenderer.on('open-lum-file', (event, data) => callback(data));
   },
-  // Remove listener
+  // Listen for external file open events (txt, md, json, etc.)
+  onOpenExternalFile: (callback) => {
+    ipcRenderer.on('open-external-file', (event, data) => callback(data));
+  },
+  // Remove listeners
   removeOpenLumFileListener: () => {
     ipcRenderer.removeAllListeners('open-lum-file');
+  },
+  removeOpenExternalFileListener: () => {
+    ipcRenderer.removeAllListeners('open-external-file');
   },
   
   // Auto-updater events
