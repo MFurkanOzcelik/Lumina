@@ -133,12 +133,27 @@ export const notesStorage = {
   },
 
   async getFolders(): Promise<any[]> {
+    let folders: any[] = [];
+    
     if (isElectron) {
-      return await fileStorage.getFolders();
+      folders = await fileStorage.getFolders();
     } else {
-      const folders = await idbStorage.get<any[]>(FOLDERS_KEY);
-      return folders || [];
+      const storedFolders = await idbStorage.get<any[]>(FOLDERS_KEY);
+      folders = storedFolders || [];
     }
+    
+    // Migrate old folders without isPinned property
+    const migratedFolders = folders.map(folder => ({
+      ...folder,
+      isPinned: folder.isPinned !== undefined ? folder.isPinned : false,
+    }));
+    
+    // Save migrated folders if any changes were made
+    if (migratedFolders.some((f, i) => f.isPinned !== folders[i]?.isPinned)) {
+      await this.saveFolders(migratedFolders);
+    }
+    
+    return migratedFolders;
   },
 
   async saveFolders(folders: any[]): Promise<void> {

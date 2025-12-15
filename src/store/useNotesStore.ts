@@ -15,6 +15,7 @@ interface NotesState {
   createFolder: (name: string) => string;
   updateFolder: (id: string, name: string) => void;
   deleteFolder: (id: string) => void;
+  togglePinFolder: (id: string) => void;
   setActiveNote: (id: string | null) => void;
   getActiveNote: () => Note | null;
   resetAll: () => Promise<void>;
@@ -119,6 +120,7 @@ export const useNotesStore = create<NotesState>()((set, get) => ({
           id,
           name,
           createdAt: Date.now(),
+          isPinned: false,
         };
         set((state) => {
           const newFolders = [...state.folders, newFolder];
@@ -150,6 +152,16 @@ export const useNotesStore = create<NotesState>()((set, get) => ({
             folders: filteredFolders,
             notes: updatedNotes,
           };
+        });
+      },
+
+      togglePinFolder: (id) => {
+        set((state) => {
+          const updatedFolders = state.folders.map((folder) =>
+            folder.id === id ? { ...folder, isPinned: !folder.isPinned } : folder
+          );
+          debouncedSaveFolders(updatedFolders);
+          return { folders: updatedFolders };
         });
       },
       

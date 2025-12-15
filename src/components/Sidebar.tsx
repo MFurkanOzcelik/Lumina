@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, FolderPlus, Trash2, ChevronRight, ChevronDown, FileText, ChevronLeft, GripVertical, Settings, Tag, X, Plus } from 'lucide-react';
+import { Search, FolderPlus, Trash2, ChevronRight, ChevronDown, FileText, ChevronLeft, GripVertical, Settings, Tag, X, Plus, Pin } from 'lucide-react';
 import { useNotesStore } from '../store/useNotesStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useTranslation } from '../utils/translations';
@@ -233,7 +233,7 @@ const DraggableNote = ({ noteId, title, isActive, onClick, onDelete, onRename, o
   );
 };
 
-const DroppableFolder = ({ folderId, name, notes, activeNoteId, onNoteClick, onNoteDelete, onFolderDelete, onFolderRename, onNoteRename, onNoteMove, onNoteExport }: any) => {
+const DroppableFolder = ({ folderId, name, notes, activeNoteId, isPinned, onNoteClick, onNoteDelete, onFolderDelete, onFolderRename, onNoteRename, onNoteMove, onNoteExport, onTogglePin }: any) => {
   const [isOpen, setIsOpen] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -315,19 +315,41 @@ const DroppableFolder = ({ folderId, name, notes, activeNoteId, onNoteClick, onN
             <span className="ml-auto text-xs opacity-70">{notes.length}</span>
           </div>
           {!isRenaming && (
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowDeleteConfirm(true);
-              }}
-              className="opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity"
-              style={{ color: isOver ? 'white' : 'var(--color-danger)' }}
-            >
-              <Trash2 size={14} />
-            </motion.button>
+            <div className="flex items-center gap-1">
+              {/* Pin Button */}
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTogglePin();
+                }}
+                className="p-1 rounded transition-all group-hover:opacity-100"
+                style={{ 
+                  color: isPinned ? 'var(--color-accent)' : 'var(--color-textSecondary)',
+                  opacity: isPinned ? 1 : 0,
+                }}
+                title={isPinned ? 'Sabitlemeyi Kaldır' : 'Sabitle'}
+              >
+                <Pin size={14} fill={isPinned ? 'currentColor' : 'none'} />
+              </motion.button>
+              
+              {/* Delete Button */}
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDeleteConfirm(true);
+                }}
+                className="opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity"
+                style={{ color: isOver ? 'white' : 'var(--color-danger)' }}
+              >
+                <Trash2 size={14} />
+              </motion.button>
+            </div>
           )}
         </motion.div>
         <AnimatePresence>
@@ -363,6 +385,8 @@ const DroppableFolder = ({ folderId, name, notes, activeNoteId, onNoteClick, onN
         onClose={() => setContextMenu(null)}
         onRename={handleRename}
         onDelete={() => setShowDeleteConfirm(true)}
+        onTogglePin={onTogglePin}
+        isPinned={isPinned}
         type="folder"
       />
       
@@ -423,7 +447,7 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
   const [showTagPanel, setShowTagPanel] = useState(true);
   const [tagSearchQuery, setTagSearchQuery] = useState('');
 
-  const { notes, folders, activeNoteId, setActiveNote, deleteNote, updateNote, createNote, createFolder, updateFolder, deleteFolder, moveNoteToFolder } =
+  const { notes, folders, activeNoteId, setActiveNote, deleteNote, updateNote, createNote, createFolder, updateFolder, deleteFolder, moveNoteToFolder, togglePinFolder } =
     useNotesStore();
   const { setSidebarCollapsed } = useSettingsStore();
   const language = useSettingsStore((state) => state.language);
@@ -940,7 +964,15 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
                 },
               }}
             >
-              {folders.map((folder) => (
+              {[...folders]
+                .sort((a, b) => {
+                  // Pinned folders first
+                  if (a.isPinned && !b.isPinned) return -1;
+                  if (!a.isPinned && b.isPinned) return 1;
+                  // Then by creation date
+                  return a.createdAt - b.createdAt;
+                })
+                .map((folder) => (
                 <motion.div
                   key={folder.id}
                   variants={{
@@ -951,6 +983,7 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
                   <DroppableFolder
                     folderId={folder.id}
                     name={folder.name}
+                    isPinned={folder.isPinned}
                     notes={filteredNotes.filter((note) => note.folderId === folder.id)}
                     activeNoteId={activeNoteId}
                     onNoteClick={setActiveNote}
@@ -960,6 +993,7 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
                     onNoteRename={handleNoteRename}
                     onNoteMove={handleNoteMove}
                     onNoteExport={handleNoteExport}
+                    onTogglePin={() => togglePinFolder(folder.id)}
                   />
                 </motion.div>
               ))}

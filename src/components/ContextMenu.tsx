@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Edit2, Trash2, FolderInput, FileDown } from 'lucide-react';
+import { Edit2, Trash2, FolderInput, FileDown, Pin, PinOff } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
 interface ContextMenuProps {
@@ -10,6 +10,8 @@ interface ContextMenuProps {
   onDelete: () => void;
   onMove?: () => void;
   onExport?: () => void;
+  onTogglePin?: () => void;
+  isPinned?: boolean;
   type: 'note' | 'folder';
 }
 
@@ -21,6 +23,8 @@ export const ContextMenu = ({
   onDelete,
   onMove,
   onExport,
+  onTogglePin,
+  isPinned,
   type,
 }: ContextMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -104,6 +108,25 @@ export const ContextMenu = ({
             >
               <FileDown size={16} />
               <span className="text-sm font-medium">Export (.lum)</span>
+            </motion.button>
+          )}
+
+          {/* Pin/Unpin Option - Only for folders */}
+          {type === 'folder' && onTogglePin && (
+            <motion.button
+              type="button"
+              whileHover={{ backgroundColor: 'var(--color-bgTertiary)' }}
+              onClick={() => {
+                onTogglePin();
+                onClose();
+              }}
+              className="w-full px-4 py-2 text-left flex items-center gap-3 transition-colors"
+              style={{ color: isPinned ? 'var(--color-accent)' : 'var(--color-text)' }}
+            >
+              {isPinned ? <PinOff size={16} /> : <Pin size={16} />}
+              <span className="text-sm font-medium">
+                {isPinned ? 'Sabitlemeyi Kaldır' : 'Sabitle'}
+              </span>
             </motion.button>
           )}
 
