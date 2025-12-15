@@ -33,6 +33,8 @@ export interface ElectronAPI {
   onOpenExternalFile?: (callback: (data: { fileName: string; content: string; filePath: string; fileType: string }) => void) => void;
   removeOpenLumFileListener?: () => void;
   removeOpenExternalFileListener?: () => void;
+  // Export
+  exportToPdf?: (title: string, htmlContent: string) => Promise<{ success: boolean; filePath?: string; error?: string; canceled?: boolean }>;
   // Auto-updater
   onUpdateAvailable?: (callback: (info: UpdateInfo) => void) => void;
   onUpdateDownloaded?: (callback: (info: UpdateInfo) => void) => void;

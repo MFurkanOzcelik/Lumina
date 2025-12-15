@@ -8,6 +8,7 @@ import { DndContext, DragEndEvent, useDroppable, useDraggable } from '@dnd-kit/c
 import { Modal } from './Modal';
 import { ContextMenu } from './ContextMenu';
 import { MoveFolderModal } from './MoveFolderModal';
+import { ExportModal } from './ExportModal';
 import TurndownService from 'turndown';
 import { getTagColor } from '../utils/tagUtils';
 import './Sidebar.css';
@@ -442,6 +443,7 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
   const [showFolderInput, setShowFolderInput] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [moveNoteId, setMoveNoteId] = useState<string | null>(null);
+  const [exportNoteId, setExportNoteId] = useState<string | null>(null);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showTagPanel, setShowTagPanel] = useState(true);
   const [tagSearchQuery, setTagSearchQuery] = useState('');
@@ -465,6 +467,10 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
   };
 
   const handleNoteExport = (noteId: string) => {
+    setExportNoteId(noteId);
+  };
+
+  const handleExportAsLum = (noteId: string) => {
     const note = notes.find((n) => n.id === noteId);
     if (!note) return;
     
@@ -513,6 +519,32 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportAsPdf = async (noteId: string) => {
+    const note = notes.find((n) => n.id === noteId);
+    if (!note) return;
+
+    if (window.electronAPI?.exportToPdf) {
+      try {
+        const result = await window.electronAPI.exportToPdf(
+          note.title || 'Untitled Note',
+          note.content
+        );
+        
+        if (result.success) {
+          console.log('PDF exported successfully:', result.filePath);
+        } else if (!result.canceled) {
+          console.error('PDF export failed:', result.error);
+          alert('Failed to export PDF: ' + result.error);
+        }
+      } catch (error) {
+        console.error('Error exporting PDF:', error);
+        alert('Failed to export PDF. Please try again.');
+      }
+    } else {
+      alert('PDF export is only available in the desktop app.');
+    }
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -1046,6 +1078,17 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
           isOpen={moveNoteId !== null}
           onClose={() => setMoveNoteId(null)}
           noteId={moveNoteId}
+        />
+      )}
+
+      {/* Export Format Modal */}
+      {exportNoteId && (
+        <ExportModal
+          isOpen={exportNoteId !== null}
+          onClose={() => setExportNoteId(null)}
+          onExportLum={() => handleExportAsLum(exportNoteId)}
+          onExportPdf={() => handleExportAsPdf(exportNoteId)}
+          noteTitle={notes.find((n) => n.id === exportNoteId)?.title || 'Untitled Note'}
         />
       )}
     </DndContext>

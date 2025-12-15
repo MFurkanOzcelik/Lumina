@@ -49,6 +49,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     saveSettings: (settings) => ipcRenderer.invoke('storage:saveSettings', settings),
     clearAll: () => ipcRenderer.invoke('storage:clearAll'),
     getUserDataPath: () => ipcRenderer.invoke('storage:getUserDataPath')
-  }
+  },
+  
+  // Export API
+  exportToPdf: (title, htmlContent) => ipcRenderer.invoke('export:pdf', { title, htmlContent })
 });
 

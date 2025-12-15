@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
@@ -354,5 +354,142 @@ ipcMain.handle('storage:clearAll', async () => {
 
 ipcMain.handle('storage:getUserDataPath', async () => {
   return userDataPath;
+});
+
+// Export to PDF handler
+ipcMain.handle('export:pdf', async (event, { title, htmlContent }) => {
+  try {
+    // Show save dialog
+    const { filePath, canceled } = await dialog.showSaveDialog(mainWindow, {
+      title: 'Export as PDF',
+      defaultPath: `${title || 'Untitled Note'}.pdf`,
+      filters: [
+        { name: 'PDF Document', extensions: ['pdf'] }
+      ]
+    });
+
+    if (canceled || !filePath) {
+      return { success: false, canceled: true };
+    }
+
+    // Create a hidden window for PDF generation
+    const pdfWindow = new BrowserWindow({
+      show: false,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+      }
+    });
+
+    // Load HTML content with styling
+    const styledHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 800px;
+              margin: 40px auto;
+              padding: 20px;
+            }
+            h1 {
+              font-size: 32px;
+              font-weight: bold;
+              margin-bottom: 20px;
+              color: #1a1a1a;
+              border-bottom: 2px solid #e0e0e0;
+              padding-bottom: 10px;
+            }
+            h2 {
+              font-size: 24px;
+              font-weight: bold;
+              margin-top: 24px;
+              margin-bottom: 12px;
+              color: #2a2a2a;
+            }
+            h3 {
+              font-size: 20px;
+              font-weight: bold;
+              margin-top: 20px;
+              margin-bottom: 10px;
+              color: #3a3a3a;
+            }
+            p {
+              margin-bottom: 12px;
+            }
+            ul, ol {
+              margin-bottom: 12px;
+              padding-left: 30px;
+            }
+            li {
+              margin-bottom: 6px;
+            }
+            strong {
+              font-weight: bold;
+            }
+            em {
+              font-style: italic;
+            }
+            code {
+              background-color: #f5f5f5;
+              padding: 2px 6px;
+              border-radius: 3px;
+              font-family: 'Courier New', monospace;
+              font-size: 0.9em;
+            }
+            pre {
+              background-color: #f5f5f5;
+              padding: 16px;
+              border-radius: 6px;
+              overflow-x: auto;
+              margin-bottom: 16px;
+            }
+            pre code {
+              background-color: transparent;
+              padding: 0;
+            }
+            blockquote {
+              border-left: 4px solid #e0e0e0;
+              padding-left: 16px;
+              margin-left: 0;
+              color: #666;
+            }
+          </style>
+        </head>
+        <body>
+          <h1>${title || 'Untitled Note'}</h1>
+          ${htmlContent}
+        </body>
+      </html>
+    `;
+
+    await pdfWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(styledHtml)}`);
+
+    // Wait for content to load
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Generate PDF
+    const pdfData = await pdfWindow.webContents.printToPDF({
+      printBackground: true,
+      marginsType: 1, // Default margins
+      pageSize: 'A4',
+    });
+
+    // Write PDF to file
+    fs.writeFileSync(filePath, pdfData);
+
+    // Close the hidden window
+    pdfWindow.close();
+
+    log.info('PDF exported successfully:', filePath);
+    return { success: true, filePath };
+  } catch (error) {
+    log.error('Error exporting PDF:', error);
+    return { success: false, error: error.message };
+  }
 });
 
