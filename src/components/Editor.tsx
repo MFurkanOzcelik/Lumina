@@ -267,7 +267,7 @@ export const Editor = () => {
     if (!activeNote || !window.electronAPI?.exportToPdf) return;
 
     try {
-      const result = await window.electronAPI.exportToPdf(content, title || 'Untitled Note');
+      const result = await window.electronAPI.exportToPdf(title || 'Untitled Note', content);
       
       if (result.success) {
         setShowSaved(true);
