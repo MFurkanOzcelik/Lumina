@@ -759,37 +759,27 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
 
                       {/* Tags Grid */}
                       <div className="flex flex-wrap gap-1.5">
-                        {filteredTags.map((tag, index) => {
+                        {filteredTags.map((tag) => {
                           const isSelected = selectedTags.includes(tag);
                           const colorClass = getTagColor(tag);
                           
                           return (
                             <motion.button
                               key={tag}
-                              initial={{ opacity: 0, scale: 0.8 }}
-                              animate={{ 
-                                opacity: 1, 
-                                scale: isSelected ? 1.05 : 1,
-                              }}
-                              transition={{ 
-                                duration: 0.2, 
-                                delay: index * 0.03,
-                                ease: 'easeOut'
-                              }}
-                              whileHover={{ scale: isSelected ? 1.08 : 1.05, y: -2 }}
+                              whileHover={{ scale: 1.05, y: -1 }}
                               whileTap={{ scale: 0.95 }}
                               onClick={() => toggleTag(tag)}
-                              className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all ${colorClass}`}
+                              className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${colorClass}`}
                               style={{
-                                opacity: isSelected ? 1 : 0.5,
+                                opacity: isSelected ? 1 : 0.6,
                                 boxShadow: isSelected 
-                                  ? '0 4px 12px rgba(0,0,0,0.25), inset 0 0 0 2px currentColor' 
+                                  ? '0 2px 8px rgba(0,0,0,0.15)' 
                                   : '0 1px 3px rgba(0,0,0,0.1)',
-                                border: isSelected 
-                                  ? '2px solid currentColor' 
-                                  : '2px solid transparent',
-                                filter: isSelected ? 'brightness(1.1) saturate(1.3)' : 'brightness(0.9) saturate(0.8)',
-                                fontWeight: isSelected ? '700' : '500',
+                                outline: isSelected 
+                                  ? '1px solid currentColor' 
+                                  : 'none',
+                                outlineOffset: '1px',
+                                filter: isSelected ? 'brightness(1.05) saturate(1.2)' : 'brightness(0.95) saturate(0.9)',
                               }}
                             >
                               {tag}
