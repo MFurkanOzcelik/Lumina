@@ -325,10 +325,9 @@ const DroppableFolder = ({ folderId, name, notes, activeNoteId, isPinned, onNote
                   e.stopPropagation();
                   onTogglePin();
                 }}
-                className="p-1 rounded transition-all group-hover:opacity-100"
+                className={`p-1 rounded transition-all ${isPinned ? '' : 'opacity-0 group-hover:opacity-100'}`}
                 style={{ 
                   color: isPinned ? 'var(--color-accent)' : 'var(--color-textSecondary)',
-                  opacity: isPinned ? 1 : 0,
                 }}
                 title={isPinned ? 'Sabitlemeyi Kaldır' : 'Sabitle'}
               >
