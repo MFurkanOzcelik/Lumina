@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { AlertCircle, Save, X, XCircle } from 'lucide-react';
+import { AlertCircle, Save, XCircle } from 'lucide-react';
 import { Modal } from './Modal';
 import { useTranslation } from '../utils/translations';
 import type { Language } from '../types';
@@ -9,7 +9,6 @@ interface UnsavedChangesModalProps {
   language: Language;
   onSave: () => void;
   onDontSave: () => void;
-  onCancel: () => void;
 }
 
 export const UnsavedChangesModal = ({
@@ -17,12 +16,16 @@ export const UnsavedChangesModal = ({
   language,
   onSave,
   onDontSave,
-  onCancel,
 }: UnsavedChangesModalProps) => {
   const t = useTranslation(language);
 
+  // Prevent closing modal by clicking outside or ESC
+  const handleClose = () => {
+    // Do nothing - user must choose Save or Don't Save
+  };
+
   return (
-    <Modal isOpen={isOpen} onClose={onCancel} title={t('unsavedChanges')}>
+    <Modal isOpen={isOpen} onClose={handleClose} title={t('unsavedChangesWarning')}>
       <div className="space-y-6">
         {/* Warning Icon and Message */}
         <div className="flex items-start gap-4">
@@ -37,28 +40,22 @@ export const UnsavedChangesModal = ({
           </div>
           <div className="flex-1">
             <p
-              className="text-base font-medium mb-2"
+              className="text-base font-medium"
               style={{ color: 'var(--color-text)' }}
             >
-              {t('unsavedChangesMessage')}
-            </p>
-            <p
-              className="text-sm"
-              style={{ color: 'var(--color-textSecondary)' }}
-            >
-              {t('unsavedChangesDetail')}
+              {t('changesNotSaved')}
             </p>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-col gap-3">
+        <div className="flex gap-3">
           {/* Save Button */}
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={onSave}
-            className="w-full px-4 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all"
+            className="flex-1 px-4 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all"
             style={{
               backgroundColor: 'var(--color-accent)',
               color: 'white',
@@ -73,7 +70,7 @@ export const UnsavedChangesModal = ({
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={onDontSave}
-            className="w-full px-4 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all"
+            className="flex-1 px-4 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all"
             style={{
               backgroundColor: 'var(--color-danger)',
               color: 'white',
@@ -81,22 +78,6 @@ export const UnsavedChangesModal = ({
           >
             <XCircle size={18} />
             {t('dontSave')}
-          </motion.button>
-
-          {/* Cancel Button */}
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={onCancel}
-            className="w-full px-4 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all"
-            style={{
-              backgroundColor: 'var(--color-bgTertiary)',
-              color: 'var(--color-text)',
-              border: '2px solid var(--color-border)',
-            }}
-          >
-            <X size={18} />
-            {t('cancel')}
           </motion.button>
         </div>
       </div>

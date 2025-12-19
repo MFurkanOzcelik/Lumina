@@ -80,14 +80,6 @@ function App() {
     }
   };
 
-  const handleUnsavedChangesCancel = () => {
-    console.log('[RENDERER] User cancelled close');
-    setShowUnsavedChangesModal(false);
-    if (window.electronAPI?.unsavedChangesCancel) {
-      window.electronAPI.unsavedChangesCancel();
-    }
-  };
-
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
@@ -418,7 +410,6 @@ function App() {
         language={language}
         onSave={handleUnsavedChangesSave}
         onDontSave={handleUnsavedChangesDontSave}
-        onCancel={handleUnsavedChangesCancel}
       />
       <UpdateNotification />
       

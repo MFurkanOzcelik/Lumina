@@ -197,9 +197,4 @@ ipcMain.on('unsaved-changes:dont-save', () => {
   win?.close()
 })
 
-ipcMain.on('unsaved-changes:cancel', () => {
-  console.log('[MAIN] Received unsaved-changes:cancel, staying open')
-  // Do nothing - window stays open
-})
-
 app.whenReady().then(createWindow)

@@ -39,7 +39,6 @@ export interface ElectronAPI {
   onShowUnsavedChangesModal?: (callback: () => void) => void;
   unsavedChangesSave?: () => void;
   unsavedChangesDontSave?: () => void;
-  unsavedChangesCancel?: () => void;
   // Auto-updater
   onUpdateAvailable?: (callback: (info: UpdateInfo) => void) => void;
   onUpdateDownloaded?: (callback: (info: UpdateInfo) => void) => void;

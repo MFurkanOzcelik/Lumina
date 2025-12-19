@@ -63,9 +63,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   unsavedChangesDontSave: () => {
     ipcRenderer.send('unsaved-changes:dont-save');
-  },
-  unsavedChangesCancel: () => {
-    ipcRenderer.send('unsaved-changes:cancel');
   }
 });
 
