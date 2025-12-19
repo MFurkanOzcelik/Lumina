@@ -27,6 +27,7 @@ import { Toast } from './Toast';
 import { TagInput } from './TagInput';
 import { ExportModal } from './ExportModal';
 import { EncryptedNoteOverlay } from './EncryptedNoteOverlay';
+import { PasswordPromptModal } from './PasswordPromptModal';
 import TurndownService from 'turndown';
 import hljs from 'highlight.js/lib/core';
 import javascript from 'highlight.js/lib/languages/javascript';
@@ -71,6 +72,7 @@ export const Editor = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showFontSize, setShowFontSize] = useState(false);
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
   const [currentFontSize, setCurrentFontSize] = useState(16);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [activeFormats, setActiveFormats] = useState<Set<string>>(new Set());
@@ -244,7 +246,7 @@ export const Editor = () => {
   };
 
   // Encryption handlers
-  const handleLockNote = async () => {
+  const handleLockNote = () => {
     console.log('[EDITOR] Lock Note clicked');
     console.log('[EDITOR] Active Note ID:', activeNoteId);
     console.log('[EDITOR] Security Enabled:', security.isEnabled);
@@ -264,20 +266,27 @@ export const Editor = () => {
     // Update the note with current editor content first
     updateNote(activeNoteId, { title, content, tags });
     
-    // Wait a bit for the update to propagate
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Show password prompt modal
+    console.log('[EDITOR] Opening password prompt modal');
+    setShowPasswordPrompt(true);
+  };
 
-    // Use a prompt to get the master password
-    const password = prompt(t('enterPassword'));
-    if (!password) {
-      console.log('[EDITOR] User cancelled password prompt');
+  const handlePasswordConfirm = async (password: string) => {
+    console.log('[EDITOR] Password confirmed from modal');
+    console.log('[EDITOR] Password length:', password.length);
+    
+    // Close the modal
+    setShowPasswordPrompt(false);
+    
+    if (!activeNoteId) {
+      console.log('[EDITOR] No active note ID');
       return;
     }
 
     console.log('[EDITOR] Verifying password...');
     // Verify the password against the stored hash
     const { verifyPassword } = await import('../utils/encryption');
-    const isValid = await verifyPassword(password, security.masterPasswordHash);
+    const isValid = await verifyPassword(password, security.masterPasswordHash!);
     
     if (!isValid) {
       console.log('[EDITOR] Password verification failed');
@@ -300,6 +309,11 @@ export const Editor = () => {
     } else {
       setToast({ message: t('encryptionError'), type: 'error' });
     }
+  };
+
+  const handlePasswordCancel = () => {
+    console.log('[EDITOR] Password prompt cancelled');
+    setShowPasswordPrompt(false);
   };
 
   const handleUnlockNote = async (password: string): Promise<boolean> => {
@@ -1993,6 +2007,16 @@ export const Editor = () => {
         onExportLum={handleExportAsLum}
         onExportPdf={handleExportAsPdf}
         noteTitle={title}
+      />
+
+      {/* Password Prompt Modal for Encryption */}
+      <PasswordPromptModal
+        isOpen={showPasswordPrompt}
+        onConfirm={handlePasswordConfirm}
+        onCancel={handlePasswordCancel}
+        title={t('enterPassword')}
+        message={t('lockNote')}
+        showHint={true}
       />
 
       {/* Encryption Toast Notifications */}
