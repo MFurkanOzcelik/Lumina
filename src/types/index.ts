@@ -19,6 +19,9 @@ export interface Note {
   };
   // Tags for categorization
   tags?: string[];
+  // Encryption support
+  isEncrypted?: boolean;
+  encryptedContent?: string;
 }
 
 export interface Folder {

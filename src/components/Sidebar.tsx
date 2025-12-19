@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, FolderPlus, Trash2, ChevronRight, ChevronDown, FileText, ChevronLeft, GripVertical, Settings, Tag, X, Plus, Pin } from 'lucide-react';
+import { Search, FolderPlus, Trash2, ChevronRight, ChevronDown, FileText, ChevronLeft, GripVertical, Settings, Tag, X, Plus, Pin, Lock } from 'lucide-react';
 import { useNotesStore } from '../store/useNotesStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useTranslation } from '../utils/translations';
@@ -20,7 +20,7 @@ interface SidebarProps {
   onSettingsClick: () => void;
 }
 
-const DraggableNote = ({ noteId, title, isActive, onClick, onDelete, onRename, onMove, onExport }: any) => {
+const DraggableNote = ({ noteId, title, isActive, isEncrypted, onClick, onDelete, onRename, onMove, onExport }: any) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -152,12 +152,15 @@ const DraggableNote = ({ noteId, title, isActive, onClick, onDelete, onRename, o
                 }}
               />
             ) : (
-              <span className="truncate text-sm" style={{ 
+              <span className="truncate text-sm flex items-center gap-1.5" style={{ 
                 fontStyle: title.trim() === '' ? 'italic' : 'normal',
                 opacity: title.trim() === '' ? 0.7 : 1
               }}>
-              {displayTitle}
-            </span>
+                {displayTitle}
+                {isEncrypted && (
+                  <Lock size={12} className="flex-shrink-0" style={{ opacity: 0.7 }} />
+                )}
+              </span>
             )}
           </div>
         </div>
@@ -366,6 +369,7 @@ const DroppableFolder = ({ folderId, name, notes, activeNoteId, isPinned, onNote
                 noteId={note.id}
                 title={note.title}
                 isActive={note.id === activeNoteId}
+                isEncrypted={note.isEncrypted || false}
                 onClick={() => onNoteClick(note.id)}
                 onDelete={() => onNoteDelete(note.id)}
                 onRename={(newTitle: string) => onNoteRename(note.id, newTitle)}
@@ -1131,6 +1135,7 @@ const DroppableFolderlessArea = ({ notes, activeNoteId, onNoteClick, onNoteDelet
                 noteId={note.id}
                 title={note.title}
                 isActive={note.id === activeNoteId}
+                isEncrypted={note.isEncrypted || false}
                 onClick={() => onNoteClick(note.id)}
                 onDelete={() => onNoteDelete(note.id)}
                 onRename={(newTitle: string) => onNoteRename(note.id, newTitle)}

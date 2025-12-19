@@ -2,17 +2,27 @@ import { create } from 'zustand';
 import type { Theme, Language } from '../types';
 import { notesStorage, debounce } from '../utils/storage';
 
+interface SecuritySettings {
+  masterPasswordHash: string | null;
+  passwordHint: string | null;
+  isEnabled: boolean;
+}
+
 interface SettingsState {
   theme: Theme;
   language: Language;
   sidebarWidth: number;
   sidebarCollapsed: boolean;
+  security: SecuritySettings;
   isHydrated: boolean;
   hydrate: () => Promise<void>;
   setTheme: (theme: Theme) => void;
   setLanguage: (language: Language) => void;
   setSidebarWidth: (width: number) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  setMasterPassword: (passwordHash: string, hint?: string) => void;
+  changeMasterPassword: (newPasswordHash: string, hint?: string) => void;
+  disableSecurity: () => void;
   resetAll: () => void;
 }
 
@@ -21,6 +31,11 @@ const initialState = {
   language: 'en' as Language,
   sidebarWidth: 280,
   sidebarCollapsed: false,
+  security: {
+    masterPasswordHash: null,
+    passwordHint: null,
+    isEnabled: false,
+  },
 };
 
 // Debounced save for settings
@@ -60,6 +75,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       language: state.language,
       sidebarWidth: state.sidebarWidth,
       sidebarCollapsed: state.sidebarCollapsed,
+      security: state.security,
     });
   },
 
@@ -71,6 +87,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       language: state.language,
       sidebarWidth: state.sidebarWidth,
       sidebarCollapsed: state.sidebarCollapsed,
+      security: state.security,
     });
   },
 
@@ -82,6 +99,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       language: state.language,
       sidebarWidth: state.sidebarWidth,
       sidebarCollapsed: state.sidebarCollapsed,
+      security: state.security,
     });
   },
 
@@ -93,6 +111,61 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       language: state.language,
       sidebarWidth: state.sidebarWidth,
       sidebarCollapsed: state.sidebarCollapsed,
+      security: state.security,
+    });
+  },
+
+  setMasterPassword: (passwordHash, hint) => {
+    set({
+      security: {
+        masterPasswordHash: passwordHash,
+        passwordHint: hint || null,
+        isEnabled: true,
+      },
+    });
+    const state = get();
+    debouncedSaveSettings({
+      theme: state.theme,
+      language: state.language,
+      sidebarWidth: state.sidebarWidth,
+      sidebarCollapsed: state.sidebarCollapsed,
+      security: state.security,
+    });
+  },
+
+  changeMasterPassword: (newPasswordHash, hint) => {
+    set({
+      security: {
+        masterPasswordHash: newPasswordHash,
+        passwordHint: hint || null,
+        isEnabled: true,
+      },
+    });
+    const state = get();
+    debouncedSaveSettings({
+      theme: state.theme,
+      language: state.language,
+      sidebarWidth: state.sidebarWidth,
+      sidebarCollapsed: state.sidebarCollapsed,
+      security: state.security,
+    });
+  },
+
+  disableSecurity: () => {
+    set({
+      security: {
+        masterPasswordHash: null,
+        passwordHint: null,
+        isEnabled: false,
+      },
+    });
+    const state = get();
+    debouncedSaveSettings({
+      theme: state.theme,
+      language: state.language,
+      sidebarWidth: state.sidebarWidth,
+      sidebarCollapsed: state.sidebarCollapsed,
+      security: state.security,
     });
   },
 

@@ -16,6 +16,8 @@ import {
   X,
   Code,
   FileDown,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import { useNotesStore } from '../store/useNotesStore';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -24,6 +26,7 @@ import { Modal } from './Modal';
 import { Toast } from './Toast';
 import { TagInput } from './TagInput';
 import { ExportModal } from './ExportModal';
+import { EncryptedNoteOverlay } from './EncryptedNoteOverlay';
 import TurndownService from 'turndown';
 import hljs from 'highlight.js/lib/core';
 import javascript from 'highlight.js/lib/languages/javascript';
@@ -45,8 +48,18 @@ hljs.registerLanguage('sql', sql);
 hljs.registerLanguage('csharp', csharp);
 
 export const Editor = () => {
-  const { activeNoteId, notes, updateNote, deleteNote, setActiveNote } = useNotesStore();
-  const language = useSettingsStore((state) => state.language);
+  const { 
+    activeNoteId, 
+    notes, 
+    updateNote, 
+    deleteNote, 
+    setActiveNote,
+    encryptNote,
+    decryptNote,
+    lockNote,
+    getDecryptedContent,
+  } = useNotesStore();
+  const { language, security } = useSettingsStore();
   const sidebarCollapsed = useSettingsStore((state) => state.sidebarCollapsed);
   const t = useTranslation(language);
 
@@ -63,9 +76,14 @@ export const Editor = () => {
   const [activeFormats, setActiveFormats] = useState<Set<string>>(new Set());
   const [activeHeading, setActiveHeading] = useState<string | null>(null); // 'h1', 'h2', 'h3', or null
   const [isEditorFocused, setIsEditorFocused] = useState(false); // Track if editor has focus
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const isRestoringCursor = useRef(false);
+  
+  // Encryption state
+  const isNoteEncrypted = activeNote?.isEncrypted || false;
+  const isNoteUnlocked = activeNote ? getDecryptedContent(activeNote.id) !== null : false;
 
   // Create and cleanup file URL for attachments
   useEffect(() => {
@@ -150,33 +168,64 @@ export const Editor = () => {
   useEffect(() => {
     if (activeNote) {
       setTitle(activeNote.title);
-      setContent(activeNote.content);
-      setTags(activeNote.tags || []); // Load tags from active note
       
-      // Update the contentEditable div only when switching notes
-      if (contentRef.current && contentRef.current.innerHTML !== activeNote.content) {
-        contentRef.current.innerHTML = activeNote.content;
+      // Handle encrypted vs plain text content
+      if (activeNote.isEncrypted) {
+        const decryptedContent = getDecryptedContent(activeNote.id);
+        if (decryptedContent) {
+          // Note is encrypted but unlocked - show decrypted content
+          setContent(decryptedContent);
+          if (contentRef.current && contentRef.current.innerHTML !== decryptedContent) {
+            contentRef.current.innerHTML = decryptedContent;
+          }
+        } else {
+          // Note is encrypted and locked - clear content
+          setContent('');
+          if (contentRef.current) {
+            contentRef.current.innerHTML = '';
+          }
+        }
+      } else {
+        // Note is not encrypted - show plain content
+        setContent(activeNote.content);
+        if (contentRef.current && contentRef.current.innerHTML !== activeNote.content) {
+          contentRef.current.innerHTML = activeNote.content;
+        }
       }
       
-      // Smart focus logic
-      setTimeout(() => {
-        const hasContent = activeNote.content.trim().length > 0;
-        const hasSavedCursor = typeof activeNote.cursorPosition === 'number';
-        
-        if (hasContent && hasSavedCursor && activeNote.cursorPosition !== undefined) {
-          // Restore cursor position in content
-          isRestoringCursor.current = true;
-          setCursorPosition(activeNote.cursorPosition);
-          setTimeout(() => {
-            isRestoringCursor.current = false;
-          }, 100);
-        } else {
-          // Focus title for new/empty notes
-          titleRef.current?.focus();
-        }
-      }, 100);
+      setTags(activeNote.tags || []); // Load tags from active note
+      
+      // Smart focus logic (only if note is not encrypted or is unlocked)
+      if (!activeNote.isEncrypted || getDecryptedContent(activeNote.id)) {
+        setTimeout(() => {
+          const hasContent = (activeNote.content || getDecryptedContent(activeNote.id) || '').trim().length > 0;
+          const hasSavedCursor = typeof activeNote.cursorPosition === 'number';
+          
+          if (hasContent && hasSavedCursor && activeNote.cursorPosition !== undefined) {
+            // Restore cursor position in content
+            isRestoringCursor.current = true;
+            setCursorPosition(activeNote.cursorPosition);
+            setTimeout(() => {
+              isRestoringCursor.current = false;
+            }, 100);
+          } else {
+            // Focus title for new/empty notes
+            titleRef.current?.focus();
+          }
+        }, 100);
+      }
     }
-  }, [activeNote?.id]); // Only trigger on note ID change
+  }, [activeNote?.id, isNoteUnlocked]); // Only trigger on note ID change
+
+  // Auto-dismiss toast after 3 seconds
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => {
+        setToast(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   const handleSave = () => {
     if (activeNoteId) {
@@ -191,6 +240,64 @@ export const Editor = () => {
       deleteNote(activeNoteId);
       setShowDeleteConfirm(false);
       setActiveNote(null);
+    }
+  };
+
+  // Encryption handlers
+  const handleLockNote = async () => {
+    if (!activeNoteId || !security.isEnabled || !security.masterPasswordHash) {
+      setToast({ message: t('setMasterPassword'), type: 'error' });
+      return;
+    }
+
+    // Use a prompt to get the master password
+    const password = prompt(t('enterPassword'));
+    if (!password) return;
+
+    // Verify the password against the stored hash
+    const { verifyPassword } = await import('../utils/encryption');
+    const isValid = await verifyPassword(password, security.masterPasswordHash);
+    
+    if (!isValid) {
+      setToast({ message: t('passwordIncorrect'), type: 'error' });
+      return;
+    }
+
+    // Encrypt the note
+    const success = await encryptNote(activeNoteId, password);
+    if (success) {
+      setToast({ message: t('noteEncrypted'), type: 'success' });
+    } else {
+      setToast({ message: t('encryptionError'), type: 'error' });
+    }
+  };
+
+  const handleUnlockNote = async (password: string): Promise<boolean> => {
+    if (!activeNoteId) return false;
+
+    const success = await decryptNote(activeNoteId, password);
+    if (success) {
+      setToast({ message: t('noteDecrypted'), type: 'success' });
+      // Refresh the content display
+      const decryptedContent = getDecryptedContent(activeNoteId);
+      if (decryptedContent) {
+        setContent(decryptedContent);
+        if (contentRef.current) {
+          contentRef.current.innerHTML = decryptedContent;
+        }
+      }
+      return true;
+    } else {
+      return false;
+    }
+  };
+
+  const handleLockNoteManually = () => {
+    if (!activeNoteId) return;
+    lockNote(activeNoteId);
+    setContent('');
+    if (contentRef.current) {
+      contentRef.current.innerHTML = '';
     }
   };
 
@@ -1152,6 +1259,46 @@ export const Editor = () => {
           {/* Actions - aligned to the right */}
           <div className="flex items-center gap-2 ml-auto">
             {/* Export Button */}
+            {/* Lock/Unlock Button - Only show if security is enabled */}
+            {security.isEnabled && (
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (isNoteEncrypted && isNoteUnlocked) {
+                    handleLockNoteManually();
+                  } else if (!isNoteEncrypted) {
+                    handleLockNote();
+                  }
+                }}
+                className="px-4 py-2 rounded-lg font-medium flex items-center gap-2"
+                style={{
+                  backgroundColor: isNoteEncrypted ? '#f59e0b' : 'var(--color-accent)',
+                  color: 'white',
+                }}
+                title={isNoteEncrypted && isNoteUnlocked ? t('lockNote') : t('lockNote')}
+              >
+                {isNoteEncrypted && isNoteUnlocked ? (
+                  <>
+                    <Lock size={18} />
+                    {t('lockNote')}
+                  </>
+                ) : isNoteEncrypted ? (
+                  <>
+                    <Lock size={18} />
+                    Locked
+                  </>
+                ) : (
+                  <>
+                    <Unlock size={18} />
+                    {t('lockNote')}
+                  </>
+                )}
+              </motion.button>
+            )}
+
             <motion.button
               type="button"
               whileHover={{ scale: 1.05 }}
@@ -1211,7 +1358,15 @@ export const Editor = () => {
         </div>
 
         {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto h-full">
+        <div className="flex-1 overflow-y-auto h-full relative">
+          {/* Encrypted Note Overlay */}
+          {isNoteEncrypted && !isNoteUnlocked && (
+            <EncryptedNoteOverlay
+              onUnlock={handleUnlockNote}
+              passwordHint={security.passwordHint}
+            />
+          )}
+
           {/* Title Input - Ghost Style */}
           <div className="px-6 pt-6 pb-4">
             <input
@@ -1808,6 +1963,13 @@ export const Editor = () => {
         onExportLum={handleExportAsLum}
         onExportPdf={handleExportAsPdf}
         noteTitle={title}
+      />
+
+      {/* Encryption Toast Notifications */}
+      <Toast
+        isVisible={toast !== null}
+        message={toast?.message || ''}
+        type={toast?.type || 'success'}
       />
     </>
   );

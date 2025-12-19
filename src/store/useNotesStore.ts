@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Note, Folder } from '../types';
 import { notesStorage, debounce } from '../utils/storage';
+import { encryptText, decryptText } from '../utils/encryption';
 
 interface NotesState {
   notes: Note[];
@@ -8,6 +9,8 @@ interface NotesState {
   activeNoteId: string | null;
   isHydrated: boolean;
   hasUnsavedChanges: boolean;
+  // Encryption state
+  decryptedContent: Map<string, string>; // noteId -> decrypted content (in-memory only)
   hydrate: () => Promise<void>;
   createNote: (folderId?: string | null) => string;
   updateNote: (id: string, updates: Partial<Note>) => void;
@@ -21,6 +24,11 @@ interface NotesState {
   getActiveNote: () => Note | null;
   resetAll: () => Promise<void>;
   saveImmediately: () => Promise<void>;
+  // Encryption methods
+  encryptNote: (noteId: string, password: string) => Promise<boolean>;
+  decryptNote: (noteId: string, password: string) => Promise<boolean>;
+  lockNote: (noteId: string) => void;
+  getDecryptedContent: (noteId: string) => string | null;
 }
 
 // Debounced save functions with unsaved change tracking
@@ -40,6 +48,7 @@ export const useNotesStore = create<NotesState>()((set, get) => ({
   activeNoteId: null,
   isHydrated: false,
   hasUnsavedChanges: false,
+  decryptedContent: new Map(),
 
   // Hydrate store from IndexedDB on app startup
   hydrate: async () => {
@@ -184,6 +193,13 @@ export const useNotesStore = create<NotesState>()((set, get) => ({
             notesStorage.saveNotes(state.notes),
             notesStorage.saveFolders(state.folders),
           ]);
+          
+          // Auto-lock: Clear decrypted content when switching notes (security feature)
+          if (state.activeNoteId) {
+            const newDecryptedContent = new Map(state.decryptedContent);
+            newDecryptedContent.delete(state.activeNoteId);
+            set({ decryptedContent: newDecryptedContent });
+          }
         }
         
         set({ activeNoteId: id, hasUnsavedChanges: false });
@@ -206,6 +222,89 @@ export const useNotesStore = create<NotesState>()((set, get) => ({
           notesStorage.saveFolders(state.folders),
         ]);
         set({ hasUnsavedChanges: false });
+      },
+
+      // Encryption Methods
+      encryptNote: async (noteId, password) => {
+        const state = get();
+        const note = state.notes.find((n) => n.id === noteId);
+        
+        if (!note) return false;
+        
+        try {
+          // Get the content to encrypt (either from decrypted cache or current content)
+          const contentToEncrypt = state.decryptedContent.get(noteId) || note.content;
+          
+          // Encrypt the content
+          const encryptedContent = encryptText(contentToEncrypt, password);
+          
+          // Update the note
+          const updatedNotes = state.notes.map((n) =>
+            n.id === noteId
+              ? {
+                  ...n,
+                  isEncrypted: true,
+                  encryptedContent,
+                  content: '', // Clear plain text content
+                  updatedAt: Date.now(),
+                }
+              : n
+          );
+          
+          // Clear decrypted content from memory
+          const newDecryptedContent = new Map(state.decryptedContent);
+          newDecryptedContent.delete(noteId);
+          
+          set({ 
+            notes: updatedNotes, 
+            decryptedContent: newDecryptedContent,
+            hasUnsavedChanges: true 
+          });
+          
+          // Save immediately for security
+          await notesStorage.saveNotes(updatedNotes);
+          set({ hasUnsavedChanges: false });
+          
+          return true;
+        } catch (error) {
+          console.error('Encryption error:', error);
+          return false;
+        }
+      },
+
+      decryptNote: async (noteId, password) => {
+        const state = get();
+        const note = state.notes.find((n) => n.id === noteId);
+        
+        if (!note || !note.isEncrypted || !note.encryptedContent) return false;
+        
+        try {
+          // Decrypt the content
+          const decryptedContent = decryptText(note.encryptedContent, password);
+          
+          // Store decrypted content in memory only (never save to disk)
+          const newDecryptedContent = new Map(state.decryptedContent);
+          newDecryptedContent.set(noteId, decryptedContent);
+          
+          set({ decryptedContent: newDecryptedContent });
+          
+          return true;
+        } catch (error) {
+          console.error('Decryption error:', error);
+          return false;
+        }
+      },
+
+      lockNote: (noteId) => {
+        const state = get();
+        const newDecryptedContent = new Map(state.decryptedContent);
+        newDecryptedContent.delete(noteId);
+        set({ decryptedContent: newDecryptedContent });
+      },
+
+      getDecryptedContent: (noteId) => {
+        const state = get();
+        return state.decryptedContent.get(noteId) || null;
       },
     }));
 
