@@ -54,9 +54,6 @@ export const translations = {
     updateReady: 'Update Ready!',
     updateReadyDescription: 'Restart to install the latest version',
     restartToUpdate: 'Restart to Update',
-    unsavedChangesWarning: 'Warning',
-    changesNotSaved: 'Changes not saved',
-    dontSave: 'Don\'t Save',
     noteSaved: 'Note saved',
   },
   tr: {
@@ -112,9 +109,6 @@ export const translations = {
     updateReady: 'Güncelleme Hazır!',
     updateReadyDescription: 'En son sürümü yüklemek için yeniden başlatın',
     restartToUpdate: 'Güncellemek İçin Yeniden Başlat',
-    unsavedChangesWarning: 'Uyarı',
-    changesNotSaved: 'Değişiklikler kaydedilmedi',
-    dontSave: 'Kaydetme',
     noteSaved: 'Not kaydedildi',
   },
 };

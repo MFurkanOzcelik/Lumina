@@ -35,10 +35,6 @@ export interface ElectronAPI {
   removeOpenExternalFileListener?: () => void;
   // Export
   exportToPdf?: (title: string, htmlContent: string) => Promise<{ success: boolean; filePath?: string; error?: string; canceled?: boolean }>;
-  // Unsaved changes modal
-  onShowUnsavedChangesModal?: (callback: () => void) => void;
-  unsavedChangesSave?: () => void;
-  unsavedChangesDontSave?: () => void;
   // Auto-updater
   onUpdateAvailable?: (callback: (info: UpdateInfo) => void) => void;
   onUpdateDownloaded?: (callback: (info: UpdateInfo) => void) => void;

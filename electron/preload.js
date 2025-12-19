@@ -52,17 +52,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   
   // Export API
-  exportToPdf: (title, htmlContent) => ipcRenderer.invoke('export:pdf', { title, htmlContent }),
-  
-  // Unsaved changes modal API
-  onShowUnsavedChangesModal: (callback) => {
-    ipcRenderer.on('show-unsaved-changes-modal', callback);
-  },
-  unsavedChangesSave: () => {
-    ipcRenderer.send('unsaved-changes:save');
-  },
-  unsavedChangesDontSave: () => {
-    ipcRenderer.send('unsaved-changes:dont-save');
-  }
+  exportToPdf: (title, htmlContent) => ipcRenderer.invoke('export:pdf', { title, htmlContent })
 });
 

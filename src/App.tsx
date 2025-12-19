@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import { SettingsModal } from './components/SettingsModal';
-import { UnsavedChangesModal } from './components/UnsavedChangesModal';
 import { Sidebar } from './components/Sidebar';
 import { HomePage } from './components/HomePage';
 import { Editor } from './components/Editor';
@@ -20,7 +19,6 @@ function App() {
     useSettingsStore();
   const { activeNoteId, isHydrated: notesHydrated, hydrate: hydrateNotes, createNote, setActiveNote, saveImmediately } = useNotesStore();
   const [showSettings, setShowSettings] = useState(false);
-  const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
   const [showOpenButton, setShowOpenButton] = useState(sidebarCollapsed);
   const [isInitializing, setIsInitializing] = useState(true);
   const [showSaveNotification, setShowSaveNotification] = useState(false);
@@ -52,45 +50,6 @@ function App() {
 
     initialize();
   }, [hydrateSettings, hydrateNotes]);
-
-  // Listen for show-unsaved-changes-modal from Main Process
-  useEffect(() => {
-    if (window.electronAPI?.onShowUnsavedChangesModal) {
-      window.electronAPI.onShowUnsavedChangesModal(() => {
-        console.log('[RENDERER] Received show-unsaved-changes-modal from main');
-        setShowUnsavedChangesModal(true);
-      });
-    }
-  }, []);
-
-  // Handle unsaved changes modal actions
-  const handleUnsavedChangesSave = async () => {
-    console.log('[RENDERER] ========== SAVE BUTTON CLICKED ==========');
-    console.log('[RENDERER] Closing modal...');
-    setShowUnsavedChangesModal(false);
-    console.log('[RENDERER] Checking if electronAPI.unsavedChangesSave exists:', !!window.electronAPI?.unsavedChangesSave);
-    if (window.electronAPI?.unsavedChangesSave) {
-      console.log('[RENDERER] Calling unsavedChangesSave()...');
-      window.electronAPI.unsavedChangesSave();
-      console.log('[RENDERER] unsavedChangesSave() called');
-    } else {
-      console.error('[RENDERER] electronAPI.unsavedChangesSave is not available!');
-    }
-  };
-
-  const handleUnsavedChangesDontSave = () => {
-    console.log('[RENDERER] ========== DONT SAVE BUTTON CLICKED ==========');
-    console.log('[RENDERER] Closing modal...');
-    setShowUnsavedChangesModal(false);
-    console.log('[RENDERER] Checking if electronAPI.unsavedChangesDontSave exists:', !!window.electronAPI?.unsavedChangesDontSave);
-    if (window.electronAPI?.unsavedChangesDontSave) {
-      console.log('[RENDERER] Calling unsavedChangesDontSave()...');
-      window.electronAPI.unsavedChangesDontSave();
-      console.log('[RENDERER] unsavedChangesDontSave() called');
-    } else {
-      console.error('[RENDERER] electronAPI.unsavedChangesDontSave is not available!');
-    }
-  };
 
   useEffect(() => {
     applyTheme(theme);
@@ -242,34 +201,6 @@ function App() {
     }
   }, [createNote, setActiveNote]);
 
-  // Expose helper functions for Main Process to call
-  useEffect(() => {
-    // Check if there are unsaved changes
-    (window as any).__checkUnsavedChanges = () => {
-      const hasUnsaved = useNotesStore.getState().hasUnsavedChanges;
-      console.log('[RENDERER] __checkUnsavedChanges called, returning:', hasUnsaved);
-      return hasUnsaved;
-    };
-
-    // Save all changes
-    (window as any).__saveChanges = async () => {
-      console.log('[RENDERER] __saveChanges called');
-      try {
-        await saveImmediately();
-        console.log('[RENDERER] __saveChanges completed successfully');
-      } catch (error) {
-        console.error('[RENDERER] __saveChanges error:', error);
-        throw error;
-      }
-    };
-
-    // Cleanup
-    return () => {
-      delete (window as any).__checkUnsavedChanges;
-      delete (window as any).__saveChanges;
-    };
-  }, [saveImmediately]);
-
   // Handle Ctrl+S keyboard shortcut to save current note
   useEffect(() => {
     const handleKeyDown = async (event: KeyboardEvent) => {
@@ -417,12 +348,6 @@ function App() {
       </motion.div>
 
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
-      <UnsavedChangesModal
-        isOpen={showUnsavedChangesModal}
-        language={language}
-        onSave={handleUnsavedChangesSave}
-        onDontSave={handleUnsavedChangesDontSave}
-      />
       <UpdateNotification />
       
       {/* Save Notification */}
