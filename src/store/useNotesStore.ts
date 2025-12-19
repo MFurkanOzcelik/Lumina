@@ -226,17 +226,35 @@ export const useNotesStore = create<NotesState>()((set, get) => ({
 
       // Encryption Methods
       encryptNote: async (noteId, password) => {
+        console.log('[STORE] encryptNote called');
+        console.log('[STORE] Note ID:', noteId);
+        console.log('[STORE] Password length:', password?.length);
+        
         const state = get();
         const note = state.notes.find((n) => n.id === noteId);
         
-        if (!note) return false;
+        if (!note) {
+          console.error('[STORE] Note not found!');
+          return false;
+        }
+        
+        console.log('[STORE] Found note:', note.title);
+        console.log('[STORE] Note content length:', note.content?.length || 0);
+        console.log('[STORE] Note already encrypted:', note.isEncrypted);
         
         try {
           // Get the content to encrypt (either from decrypted cache or current content)
           const contentToEncrypt = state.decryptedContent.get(noteId) || note.content;
+          console.log('[STORE] Content to encrypt length:', contentToEncrypt?.length || 0);
+          
+          if (!contentToEncrypt || contentToEncrypt.trim().length === 0) {
+            console.warn('[STORE] Warning: Encrypting empty content');
+          }
           
           // Encrypt the content
+          console.log('[STORE] Calling encryptText...');
           const encryptedContent = encryptText(contentToEncrypt, password);
+          console.log('[STORE] Encrypted content length:', encryptedContent?.length || 0);
           
           // Update the note
           const updatedNotes = state.notes.map((n) =>
@@ -251,6 +269,8 @@ export const useNotesStore = create<NotesState>()((set, get) => ({
               : n
           );
           
+          console.log('[STORE] Updated notes array');
+          
           // Clear decrypted content from memory
           const newDecryptedContent = new Map(state.decryptedContent);
           newDecryptedContent.delete(noteId);
@@ -261,13 +281,17 @@ export const useNotesStore = create<NotesState>()((set, get) => ({
             hasUnsavedChanges: true 
           });
           
+          console.log('[STORE] State updated, saving to storage...');
+          
           // Save immediately for security
           await notesStorage.saveNotes(updatedNotes);
           set({ hasUnsavedChanges: false });
           
+          console.log('[STORE] ✅ Encryption successful and saved!');
           return true;
         } catch (error) {
-          console.error('Encryption error:', error);
+          console.error('[STORE] ❌ Encryption error:', error);
+          console.error('[STORE] Error details:', error instanceof Error ? error.message : String(error));
           return false;
         }
       },

@@ -25,7 +25,13 @@ export async function hashPassword(password: string): Promise<string> {
  * @returns True if password matches
  */
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(password, hash);
+  console.log('[ENCRYPTION] verifyPassword called');
+  console.log('[ENCRYPTION] Password length:', password?.length || 0);
+  console.log('[ENCRYPTION] Hash exists:', !!hash);
+  
+  const result = await bcrypt.compare(password, hash);
+  console.log('[ENCRYPTION] Password verification result:', result);
+  return result;
 }
 
 /**
@@ -35,15 +41,22 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
  * @returns Encrypted string
  */
 export function encryptText(plainText: string, password: string): string {
+  console.log('[ENCRYPTION] encryptText called');
+  console.log('[ENCRYPTION] Plain text length:', plainText?.length || 0);
+  console.log('[ENCRYPTION] Password length:', password?.length || 0);
+  
   if (!plainText || !password) {
+    console.error('[ENCRYPTION] Missing plainText or password');
     throw new Error('Plain text and password are required for encryption');
   }
   
   try {
+    console.log('[ENCRYPTION] Calling CryptoJS.AES.encrypt...');
     const encrypted = CryptoJS.AES.encrypt(plainText, password).toString();
+    console.log('[ENCRYPTION] ✅ Encryption successful, result length:', encrypted.length);
     return encrypted;
   } catch (error) {
-    console.error('Encryption error:', error);
+    console.error('[ENCRYPTION] ❌ Encryption error:', error);
     throw new Error('Failed to encrypt content');
   }
 }

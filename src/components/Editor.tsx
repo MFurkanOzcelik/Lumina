@@ -245,28 +245,58 @@ export const Editor = () => {
 
   // Encryption handlers
   const handleLockNote = async () => {
+    console.log('[EDITOR] Lock Note clicked');
+    console.log('[EDITOR] Active Note ID:', activeNoteId);
+    console.log('[EDITOR] Security Enabled:', security.isEnabled);
+    console.log('[EDITOR] Master Password Hash exists:', !!security.masterPasswordHash);
+    
     if (!activeNoteId || !security.isEnabled || !security.masterPasswordHash) {
+      console.log('[EDITOR] Cannot lock - missing requirements');
       setToast({ message: t('setMasterPassword'), type: 'error' });
       return;
     }
 
+    // CRITICAL FIX: Save current content to note before encrypting
+    console.log('[EDITOR] Saving current content before encryption...');
+    console.log('[EDITOR] Current content length:', content.length);
+    console.log('[EDITOR] Current title:', title);
+    
+    // Update the note with current editor content first
+    updateNote(activeNoteId, { title, content, tags });
+    
+    // Wait a bit for the update to propagate
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     // Use a prompt to get the master password
     const password = prompt(t('enterPassword'));
-    if (!password) return;
+    if (!password) {
+      console.log('[EDITOR] User cancelled password prompt');
+      return;
+    }
 
+    console.log('[EDITOR] Verifying password...');
     // Verify the password against the stored hash
     const { verifyPassword } = await import('../utils/encryption');
     const isValid = await verifyPassword(password, security.masterPasswordHash);
     
     if (!isValid) {
+      console.log('[EDITOR] Password verification failed');
       setToast({ message: t('passwordIncorrect'), type: 'error' });
       return;
     }
 
+    console.log('[EDITOR] Password verified, encrypting note...');
     // Encrypt the note
     const success = await encryptNote(activeNoteId, password);
+    console.log('[EDITOR] Encryption result:', success);
+    
     if (success) {
       setToast({ message: t('noteEncrypted'), type: 'success' });
+      // Clear the editor content display
+      setContent('');
+      if (contentRef.current) {
+        contentRef.current.innerHTML = '';
+      }
     } else {
       setToast({ message: t('encryptionError'), type: 'error' });
     }
