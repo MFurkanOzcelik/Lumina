@@ -1,7 +1,8 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import { SettingsModal } from './components/SettingsModal';
+import { UnsavedChangesModal } from './components/UnsavedChangesModal';
 import { Sidebar } from './components/Sidebar';
 import { HomePage } from './components/HomePage';
 import { Editor } from './components/Editor';
@@ -19,13 +20,11 @@ function App() {
     useSettingsStore();
   const { activeNoteId, isHydrated: notesHydrated, hydrate: hydrateNotes, createNote, setActiveNote, saveImmediately } = useNotesStore();
   const [showSettings, setShowSettings] = useState(false);
+  const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
   const [showOpenButton, setShowOpenButton] = useState(sidebarCollapsed);
   const [isInitializing, setIsInitializing] = useState(true);
   const [showSaveNotification, setShowSaveNotification] = useState(false);
   const t = useTranslation(language);
-  
-  // useRef to track isDirty state for IPC listener (prevents stale closure)
-  const isDirtyRef = useRef(false);
 
   // Initialize app: migrate data and hydrate stores
   useEffect(() => {
@@ -54,60 +53,40 @@ function App() {
     initialize();
   }, [hydrateSettings, hydrateNotes]);
 
-  // Sync isDirtyRef with hasUnsavedChanges state (prevents stale closure)
+  // Listen for show-unsaved-changes-modal from Main Process
   useEffect(() => {
-    const unsubscribe = useNotesStore.subscribe((state) => {
-      isDirtyRef.current = state.hasUnsavedChanges;
-      console.log('[RENDERER] isDirtyRef updated:', isDirtyRef.current);
-    });
-    
-    // Initialize ref with current state
-    isDirtyRef.current = useNotesStore.getState().hasUnsavedChanges;
-    
-    return unsubscribe;
+    if (window.electronAPI?.onShowUnsavedChangesModal) {
+      window.electronAPI.onShowUnsavedChangesModal(() => {
+        console.log('[RENDERER] Received show-unsaved-changes-modal from main');
+        setShowUnsavedChangesModal(true);
+      });
+    }
   }, []);
 
-  // EVENT PING-PONG PATTERN: Step 2 - Listen for check-unsaved-changes from Main Process
-  useEffect(() => {
-    if (window.electronAPI?.onCheckUnsavedChanges) {
-      window.electronAPI.onCheckUnsavedChanges(() => {
-        console.log('[RENDERER] Received check-unsaved-changes from main');
-        
-        // CRUCIAL: Read from ref, NOT from state (prevents stale closure)
-        const isDirty = isDirtyRef.current;
-        
-        console.log('[RENDERER] Checked changes. isDirty:', isDirty, '(from ref)');
-        
-        // Send status back to main process
-        if (window.electronAPI?.sendUnsavedChangesStatus) {
-          window.electronAPI.sendUnsavedChangesStatus(isDirty, language);
-          console.log('[RENDERER] Sent unsaved-changes-status to main. isDirty:', isDirty, 'language:', language);
-        }
-      });
+  // Handle unsaved changes modal actions
+  const handleUnsavedChangesSave = async () => {
+    console.log('[RENDERER] User chose to save');
+    setShowUnsavedChangesModal(false);
+    if (window.electronAPI?.unsavedChangesSave) {
+      window.electronAPI.unsavedChangesSave();
     }
-  }, [language]);
+  };
 
-  // Handle save-before-quit request from main process
-  useEffect(() => {
-    if (window.electronAPI?.onSaveBeforeQuit) {
-      window.electronAPI.onSaveBeforeQuit(async () => {
-        console.log('Save before quit requested');
-        try {
-          await saveImmediately();
-          console.log('Save completed, notifying main process');
-          if (window.electronAPI?.saveCompleted) {
-            window.electronAPI.saveCompleted();
-          }
-        } catch (error) {
-          console.error('Error saving before quit:', error);
-          // Even if save fails, notify main process to allow close
-          if (window.electronAPI?.saveCompleted) {
-            window.electronAPI.saveCompleted();
-          }
-        }
-      });
+  const handleUnsavedChangesDontSave = () => {
+    console.log('[RENDERER] User chose not to save');
+    setShowUnsavedChangesModal(false);
+    if (window.electronAPI?.unsavedChangesDontSave) {
+      window.electronAPI.unsavedChangesDontSave();
     }
-  }, [saveImmediately]);
+  };
+
+  const handleUnsavedChangesCancel = () => {
+    console.log('[RENDERER] User cancelled close');
+    setShowUnsavedChangesModal(false);
+    if (window.electronAPI?.unsavedChangesCancel) {
+      window.electronAPI.unsavedChangesCancel();
+    }
+  };
 
   useEffect(() => {
     applyTheme(theme);
@@ -259,6 +238,34 @@ function App() {
     }
   }, [createNote, setActiveNote]);
 
+  // Expose helper functions for Main Process to call
+  useEffect(() => {
+    // Check if there are unsaved changes
+    (window as any).__checkUnsavedChanges = () => {
+      const hasUnsaved = useNotesStore.getState().hasUnsavedChanges;
+      console.log('[RENDERER] __checkUnsavedChanges called, returning:', hasUnsaved);
+      return hasUnsaved;
+    };
+
+    // Save all changes
+    (window as any).__saveChanges = async () => {
+      console.log('[RENDERER] __saveChanges called');
+      try {
+        await saveImmediately();
+        console.log('[RENDERER] __saveChanges completed successfully');
+      } catch (error) {
+        console.error('[RENDERER] __saveChanges error:', error);
+        throw error;
+      }
+    };
+
+    // Cleanup
+    return () => {
+      delete (window as any).__checkUnsavedChanges;
+      delete (window as any).__saveChanges;
+    };
+  }, [saveImmediately]);
+
   // Handle Ctrl+S keyboard shortcut to save current note
   useEffect(() => {
     const handleKeyDown = async (event: KeyboardEvent) => {
@@ -406,6 +413,13 @@ function App() {
       </motion.div>
 
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      <UnsavedChangesModal
+        isOpen={showUnsavedChangesModal}
+        language={language}
+        onSave={handleUnsavedChangesSave}
+        onDontSave={handleUnsavedChangesDontSave}
+        onCancel={handleUnsavedChangesCancel}
+      />
       <UpdateNotification />
       
       {/* Save Notification */}

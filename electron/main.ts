@@ -52,6 +52,8 @@ function createWindow() {
 
   // Handle window close event - check for unsaved changes
   win.on('close', async (event) => {
+    console.log('[MAIN] Close event triggered, isQuitting:', isQuitting)
+    
     if (isQuitting) {
       return // Allow close if quitting
     }
@@ -65,39 +67,21 @@ function createWindow() {
         'window.__checkUnsavedChanges ? window.__checkUnsavedChanges() : false'
       )
 
+      console.log('[MAIN] Unsaved changes check result:', hasUnsavedChanges)
+
       if (!hasUnsavedChanges) {
         // No unsaved changes, proceed with close
+        console.log('[MAIN] No unsaved changes, closing app')
         isQuitting = true
         win?.close()
         return
       }
 
-      // Show confirmation dialog
-      const response = await dialog.showMessageBox(win!, {
-        type: 'question',
-        buttons: ['Save', 'Don\'t Save', 'Cancel'],
-        defaultId: 0,
-        cancelId: 2,
-        title: 'Unsaved Changes',
-        message: 'Do you want to save changes?',
-        detail: 'Your changes will be lost if you don\'t save them.',
-      })
-
-      if (response.response === 0) {
-        // Save button clicked
-        await win?.webContents.executeJavaScript(
-          'window.__saveChanges ? window.__saveChanges() : Promise.resolve()'
-        )
-        isQuitting = true
-        win?.close()
-      } else if (response.response === 1) {
-        // Don't Save button clicked
-        isQuitting = true
-        win?.close()
-      }
-      // Cancel (response === 2) - do nothing, window stays open
+      // Has unsaved changes - tell renderer to show custom modal
+      console.log('[MAIN] Unsaved changes detected, sending show-unsaved-changes-modal to renderer')
+      win?.webContents.send('show-unsaved-changes-modal')
     } catch (error) {
-      console.error('Error handling window close:', error)
+      console.error('[MAIN] Error handling window close:', error)
       // On error, allow close
       isQuitting = true
       win?.close()
@@ -187,6 +171,35 @@ ipcMain.handle('storage:clearAll', async () => {
 
 ipcMain.handle('storage:getUserDataPath', async () => {
   return USER_DATA_PATH
+})
+
+// Unsaved Changes Modal Actions
+ipcMain.on('unsaved-changes:save', async () => {
+  console.log('[MAIN] Received unsaved-changes:save')
+  try {
+    // Tell renderer to save changes
+    await win?.webContents.executeJavaScript(
+      'window.__saveChanges ? window.__saveChanges() : Promise.resolve()'
+    )
+    console.log('[MAIN] Save completed, closing app')
+    isQuitting = true
+    win?.close()
+  } catch (error) {
+    console.error('[MAIN] Error saving before quit:', error)
+    isQuitting = true
+    win?.close()
+  }
+})
+
+ipcMain.on('unsaved-changes:dont-save', () => {
+  console.log('[MAIN] Received unsaved-changes:dont-save, closing without saving')
+  isQuitting = true
+  win?.close()
+})
+
+ipcMain.on('unsaved-changes:cancel', () => {
+  console.log('[MAIN] Received unsaved-changes:cancel, staying open')
+  // Do nothing - window stays open
 })
 
 app.whenReady().then(createWindow)

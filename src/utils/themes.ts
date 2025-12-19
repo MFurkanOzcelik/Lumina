@@ -12,6 +12,8 @@ export const themes = {
     accentHover: '#2563eb',
     danger: '#ef4444',
     success: '#10b981',
+    warning: '#f59e0b',
+    warningBg: '#fef3c7',
     shadow: 'rgba(0, 0, 0, 0.1)',
   },
   dark: {
@@ -25,6 +27,8 @@ export const themes = {
     accentHover: '#2563eb',
     danger: '#ef4444',
     success: '#10b981',
+    warning: '#f59e0b',
+    warningBg: '#451a03',
     shadow: 'rgba(0, 0, 0, 0.3)',
   },
   ocean: {
@@ -38,6 +42,8 @@ export const themes = {
     accentHover: '#0891b2',
     danger: '#ef4444',
     success: '#10b981',
+    warning: '#f59e0b',
+    warningBg: '#0c4a6e',
     shadow: 'rgba(6, 182, 212, 0.2)',
   },
   sakura: {
@@ -51,6 +57,8 @@ export const themes = {
     accentHover: '#be185d',
     danger: '#ef4444',
     success: '#10b981',
+    warning: '#f59e0b',
+    warningBg: '#fef3c7',
     shadow: 'rgba(219, 39, 119, 0.15)',
   },
 };
