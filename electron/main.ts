@@ -1,11 +1,11 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron'
 import path from 'path'
 import fs from 'fs'
 
 process.env.DIST = path.join(__dirname, '../dist')
 process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(__dirname, '../public')
 
-let win: BrowserWindow | null
+let mainWindow: BrowserWindow | null = null
 
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 
@@ -23,58 +23,85 @@ if (!fs.existsSync(USER_DATA_PATH)) {
 console.log('User data will be stored in:', USER_DATA_PATH)
 
 function createWindow() {
-  // Use high-resolution .ico file for Windows taskbar and desktop
-  // In production, files are in VITE_PUBLIC (which points to dist or public)
   const iconPath = process.platform === 'win32' 
     ? path.join(process.env.VITE_PUBLIC || '', 'icon.ico')
     : path.join(process.env.VITE_PUBLIC || '', 'logo.png')
   
-  win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
-      contextIsolation: true, // Security: isolate context
+      contextIsolation: true,
     },
-    autoHideMenuBar: true, // Üstteki dosya/düzen menüsünü gizler
-    fullscreen: false, // Don't start in fullscreen mode
-    show: false, // Don't show until ready
+    autoHideMenuBar: true,
+    fullscreen: false,
+    show: false,
   })
 
-  // Maximize window when ready to show
-  win.once('ready-to-show', () => {
-    win?.maximize()
-    win?.show()
+  // Maximize and show when ready
+  mainWindow.once('ready-to-show', () => {
+    mainWindow?.maximize()
+    mainWindow?.show()
   })
 
-  // Clean up window reference when closed
-  win.on('closed', () => {
-    win = null
+  // Dereference the window object when closed
+  mainWindow.on('closed', () => {
+    mainWindow = null
   })
 
-  // Geliştirme ortamındaysan localhost'u, build alındıysa html dosyasını yükle
+  // Load the app
   if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL)
+    mainWindow.loadURL(VITE_DEV_SERVER_URL)
   } else {
-    win.loadFile(path.join(process.env.DIST || '', 'index.html'))
+    mainWindow.loadFile(path.join(process.env.DIST || '', 'index.html'))
   }
 }
 
+// ============================================================================
+// STANDARD ELECTRON LIFECYCLE EVENTS - DO NOT MODIFY
+// ============================================================================
+
+// Quit when all windows are closed (Windows & Linux)
 app.on('window-all-closed', () => {
+  console.log('[MAIN] window-all-closed event fired')
   if (process.platform !== 'darwin') {
+    console.log('[MAIN] Calling app.quit()')
     app.quit()
   }
 })
 
+// On macOS, re-create window when dock icon is clicked
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow()
   }
 })
 
-// Storage helper functions
+// Create window when app is ready
+app.whenReady().then(() => {
+  createWindow()
+  
+  // Register FORCE QUIT shortcut: Ctrl+Shift+Q (for debugging)
+  globalShortcut.register('CommandOrControl+Shift+Q', () => {
+    console.log('[MAIN] FORCE QUIT shortcut pressed - calling app.exit(0)')
+    app.exit(0) // Force immediate exit, bypassing all events
+  })
+  
+  console.log('[MAIN] App ready. Force quit shortcut: Ctrl+Shift+Q')
+})
+
+// Unregister shortcuts on quit
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
+})
+
+// ============================================================================
+// STORAGE HELPER FUNCTIONS
+// ============================================================================
+
 function readJsonFile(filePath: string, defaultValue: any = null): any {
   try {
     if (fs.existsSync(filePath)) {
@@ -98,7 +125,10 @@ function writeJsonFile(filePath: string, data: any): boolean {
   }
 }
 
-// IPC Handlers for persistent storage
+// ============================================================================
+// IPC HANDLERS FOR PERSISTENT STORAGE
+// ============================================================================
+
 ipcMain.handle('storage:getNotes', async () => {
   return readJsonFile(NOTES_FILE, [])
 })
@@ -138,5 +168,3 @@ ipcMain.handle('storage:clearAll', async () => {
 ipcMain.handle('storage:getUserDataPath', async () => {
   return USER_DATA_PATH
 })
-
-app.whenReady().then(createWindow)
