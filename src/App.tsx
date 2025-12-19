@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import { SettingsModal } from './components/SettingsModal';
@@ -10,16 +10,22 @@ import { useSettingsStore } from './store/useSettingsStore';
 import { useNotesStore } from './store/useNotesStore';
 import { applyTheme } from './utils/themes';
 import { migrateFromLocalStorage, migrateToFileStorage } from './utils/storage';
+import { useTranslation } from './utils/translations';
 
 // File open handler types (storage types are in electron.d.ts)
 
 function App() {
-  const { theme, sidebarWidth, sidebarCollapsed, isHydrated: settingsHydrated, hydrate: hydrateSettings, setSidebarWidth, setSidebarCollapsed } =
+  const { theme, language, sidebarWidth, sidebarCollapsed, isHydrated: settingsHydrated, hydrate: hydrateSettings, setSidebarWidth, setSidebarCollapsed } =
     useSettingsStore();
-  const { activeNoteId, isHydrated: notesHydrated, hydrate: hydrateNotes, createNote, setActiveNote } = useNotesStore();
+  const { activeNoteId, isHydrated: notesHydrated, hydrate: hydrateNotes, createNote, setActiveNote, saveImmediately } = useNotesStore();
   const [showSettings, setShowSettings] = useState(false);
   const [showOpenButton, setShowOpenButton] = useState(sidebarCollapsed);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [showSaveNotification, setShowSaveNotification] = useState(false);
+  const t = useTranslation(language);
+  
+  // useRef to track isDirty state for IPC listener (prevents stale closure)
+  const isDirtyRef = useRef(false);
 
   // Initialize app: migrate data and hydrate stores
   useEffect(() => {
@@ -47,6 +53,61 @@ function App() {
 
     initialize();
   }, [hydrateSettings, hydrateNotes]);
+
+  // Sync isDirtyRef with hasUnsavedChanges state (prevents stale closure)
+  useEffect(() => {
+    const unsubscribe = useNotesStore.subscribe((state) => {
+      isDirtyRef.current = state.hasUnsavedChanges;
+      console.log('[RENDERER] isDirtyRef updated:', isDirtyRef.current);
+    });
+    
+    // Initialize ref with current state
+    isDirtyRef.current = useNotesStore.getState().hasUnsavedChanges;
+    
+    return unsubscribe;
+  }, []);
+
+  // EVENT PING-PONG PATTERN: Step 2 - Listen for check-unsaved-changes from Main Process
+  useEffect(() => {
+    if (window.electronAPI?.onCheckUnsavedChanges) {
+      window.electronAPI.onCheckUnsavedChanges(() => {
+        console.log('[RENDERER] Received check-unsaved-changes from main');
+        
+        // CRUCIAL: Read from ref, NOT from state (prevents stale closure)
+        const isDirty = isDirtyRef.current;
+        
+        console.log('[RENDERER] Checked changes. isDirty:', isDirty, '(from ref)');
+        
+        // Send status back to main process
+        if (window.electronAPI?.sendUnsavedChangesStatus) {
+          window.electronAPI.sendUnsavedChangesStatus(isDirty, language);
+          console.log('[RENDERER] Sent unsaved-changes-status to main. isDirty:', isDirty, 'language:', language);
+        }
+      });
+    }
+  }, [language]);
+
+  // Handle save-before-quit request from main process
+  useEffect(() => {
+    if (window.electronAPI?.onSaveBeforeQuit) {
+      window.electronAPI.onSaveBeforeQuit(async () => {
+        console.log('Save before quit requested');
+        try {
+          await saveImmediately();
+          console.log('Save completed, notifying main process');
+          if (window.electronAPI?.saveCompleted) {
+            window.electronAPI.saveCompleted();
+          }
+        } catch (error) {
+          console.error('Error saving before quit:', error);
+          // Even if save fails, notify main process to allow close
+          if (window.electronAPI?.saveCompleted) {
+            window.electronAPI.saveCompleted();
+          }
+        }
+      });
+    }
+  }, [saveImmediately]);
 
   useEffect(() => {
     applyTheme(theme);
@@ -104,15 +165,52 @@ function App() {
     }
   }, [createNote, setActiveNote]);
 
-  // Handle external file opening (txt, md, json) from "Open with Lumina"
+  // Handle external file opening (txt, md, json, pdf) from "Open with Lumina"
   useEffect(() => {
     if (window.electronAPI?.onOpenExternalFile) {
-      window.electronAPI.onOpenExternalFile((data) => {
-        const { fileName, content, fileType } = data;
+      window.electronAPI.onOpenExternalFile((data: any) => {
+        const { fileName, content, fileType, filePath, isPdf } = data;
         
-        console.log('Opening external file:', fileName, fileType);
+        console.log('Opening external file:', fileName, fileType, 'isPdf:', isPdf);
         
-        // Parse content based on file type
+        // Create a new note
+        const newNoteId = createNote(null);
+        
+        // For PDF files, attach the file
+        if (isPdf && filePath) {
+          setTimeout(() => {
+            const notesStore = useNotesStore.getState();
+            
+            // Read the PDF file as blob
+            fetch(`file:///${filePath.replace(/\\/g, '/')}`)
+              .then(res => res.blob())
+              .then(blob => {
+                notesStore.updateNote(newNoteId, { 
+                  title: fileName,
+                  content: '',
+                  attachment: {
+                    name: fileName + '.pdf',
+                    type: 'application/pdf',
+                    size: blob.size,
+                    blob: blob
+                  }
+                });
+                setActiveNote(newNoteId);
+              })
+              .catch(err => {
+                console.error('Error loading PDF:', err);
+                // Fallback: just set title
+                notesStore.updateNote(newNoteId, { 
+                  title: fileName,
+                  content: `<p>PDF dosyası: ${fileName}.pdf</p>`
+                });
+                setActiveNote(newNoteId);
+              });
+          }, 100);
+          return;
+        }
+        
+        // Parse content based on file type for text files
         let noteContent = content;
         let noteTitle = fileName;
         
@@ -139,11 +237,8 @@ function App() {
         // For plain text, wrap in paragraph
         if (fileType === '.txt') {
           // Convert line breaks to HTML
-          noteContent = content.split('\n').map(line => `<p>${line || '<br>'}</p>`).join('');
+          noteContent = content.split('\n').map((line: string) => `<p>${line || '<br>'}</p>`).join('');
         }
-        
-        // Create a new note with the imported content
-        const newNoteId = createNote(null);
         
         // Update the note with title and content
         setTimeout(() => {
@@ -164,6 +259,41 @@ function App() {
     }
   }, [createNote, setActiveNote]);
 
+  // Handle Ctrl+S keyboard shortcut to save current note
+  useEffect(() => {
+    const handleKeyDown = async (event: KeyboardEvent) => {
+      // Check for Ctrl+S (Windows/Linux) or Cmd+S (Mac)
+      if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+        event.preventDefault(); // Prevent browser's default save dialog
+        
+        if (activeNoteId) {
+          console.log('Ctrl+S pressed, saving note:', activeNoteId);
+          
+          try {
+            await saveImmediately();
+            
+            // Show save notification
+            setShowSaveNotification(true);
+            setTimeout(() => {
+              setShowSaveNotification(false);
+            }, 2000);
+            
+            console.log('Note saved successfully');
+          } catch (error) {
+            console.error('Error saving note:', error);
+          }
+        }
+      }
+    };
+
+    // Add event listener
+    window.addEventListener('keydown', handleKeyDown);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [activeNoteId, saveImmediately]);
 
   // Show loading screen while initializing
   if (isInitializing || !settingsHydrated || !notesHydrated) {
@@ -277,6 +407,39 @@ function App() {
 
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
       <UpdateNotification />
+      
+      {/* Save Notification */}
+      <AnimatePresence>
+        {showSaveNotification && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-8 right-8 px-6 py-3 rounded-lg shadow-lg z-50"
+            style={{
+              backgroundColor: 'var(--color-accent)',
+              color: 'white',
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+              <span className="font-medium">{t('noteSaved')}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

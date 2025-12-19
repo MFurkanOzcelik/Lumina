@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import path from 'path'
 import fs from 'fs'
 
@@ -6,6 +6,7 @@ process.env.DIST = path.join(__dirname, '../dist')
 process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(__dirname, '../public')
 
 let win: BrowserWindow | null
+let isQuitting = false
 
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 
@@ -47,6 +48,60 @@ function createWindow() {
   win.once('ready-to-show', () => {
     win?.maximize()
     win?.show()
+  })
+
+  // Handle window close event - check for unsaved changes
+  win.on('close', async (event) => {
+    if (isQuitting) {
+      return // Allow close if quitting
+    }
+
+    // Prevent immediate close
+    event.preventDefault()
+
+    try {
+      // Ask renderer if there are unsaved changes
+      const hasUnsavedChanges = await win?.webContents.executeJavaScript(
+        'window.__checkUnsavedChanges ? window.__checkUnsavedChanges() : false'
+      )
+
+      if (!hasUnsavedChanges) {
+        // No unsaved changes, proceed with close
+        isQuitting = true
+        win?.close()
+        return
+      }
+
+      // Show confirmation dialog
+      const response = await dialog.showMessageBox(win!, {
+        type: 'question',
+        buttons: ['Save', 'Don\'t Save', 'Cancel'],
+        defaultId: 0,
+        cancelId: 2,
+        title: 'Unsaved Changes',
+        message: 'Do you want to save changes?',
+        detail: 'Your changes will be lost if you don\'t save them.',
+      })
+
+      if (response.response === 0) {
+        // Save button clicked
+        await win?.webContents.executeJavaScript(
+          'window.__saveChanges ? window.__saveChanges() : Promise.resolve()'
+        )
+        isQuitting = true
+        win?.close()
+      } else if (response.response === 1) {
+        // Don't Save button clicked
+        isQuitting = true
+        win?.close()
+      }
+      // Cancel (response === 2) - do nothing, window stays open
+    } catch (error) {
+      console.error('Error handling window close:', error)
+      // On error, allow close
+      isQuitting = true
+      win?.close()
+    }
   })
 
   // Geliştirme ortamındaysan localhost'u, build alındıysa html dosyasını yükle

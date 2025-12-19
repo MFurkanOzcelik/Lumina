@@ -1219,9 +1219,10 @@ export const Editor = () => {
               type="text"
               value={title}
               onChange={(e) => {
-                setTitle(e.target.value);
+                const newTitle = e.target.value;
+                setTitle(newTitle);
                 if (activeNoteId) {
-                  updateNote(activeNoteId, { title: e.target.value });
+                  updateNote(activeNoteId, { title: newTitle });
                 }
               }}
               onFocus={() => setIsEditorFocused(false)}
@@ -1358,8 +1359,14 @@ export const Editor = () => {
                 saveCursorPosition();
               }}
               onInput={(e) => {
-                // Just update state, don't re-render the div
-                setContent(e.currentTarget.innerHTML);
+                // Update local state and store immediately
+                const newContent = e.currentTarget.innerHTML;
+                setContent(newContent);
+                
+                // Update store immediately (debounced save will handle persistence)
+                if (activeNoteId) {
+                  updateNote(activeNoteId, { content: newContent });
+                }
                 
                 // Handle inline markdown formatting (**bold**, *italic*, ~~strikethrough~~, `code`)
                 const selection = window.getSelection();

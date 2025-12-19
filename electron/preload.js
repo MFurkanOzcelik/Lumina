@@ -52,6 +52,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   
   // Export API
-  exportToPdf: (title, htmlContent) => ipcRenderer.invoke('export:pdf', { title, htmlContent })
+  exportToPdf: (title, htmlContent) => ipcRenderer.invoke('export:pdf', { title, htmlContent }),
+  
+  // Unsaved changes API (Event Ping-Pong Pattern)
+  onCheckUnsavedChanges: (callback) => {
+    ipcRenderer.on('check-unsaved-changes', callback);
+  },
+  sendUnsavedChangesStatus: (isDirty, language) => {
+    ipcRenderer.send('unsaved-changes-status', { isDirty, language });
+  },
+  onSaveBeforeQuit: (callback) => {
+    ipcRenderer.on('save-before-quit', callback);
+  },
+  saveCompleted: () => {
+    ipcRenderer.send('save-completed');
+  }
 });
 

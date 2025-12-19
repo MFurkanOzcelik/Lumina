@@ -35,6 +35,11 @@ export interface ElectronAPI {
   removeOpenExternalFileListener?: () => void;
   // Export
   exportToPdf?: (title: string, htmlContent: string) => Promise<{ success: boolean; filePath?: string; error?: string; canceled?: boolean }>;
+  // Unsaved changes (Event Ping-Pong Pattern)
+  onCheckUnsavedChanges?: (callback: () => void) => void;
+  sendUnsavedChangesStatus?: (isDirty: boolean, language: string) => void;
+  onSaveBeforeQuit?: (callback: () => void) => void;
+  saveCompleted?: () => void;
   // Auto-updater
   onUpdateAvailable?: (callback: (info: UpdateInfo) => void) => void;
   onUpdateDownloaded?: (callback: (info: UpdateInfo) => void) => void;

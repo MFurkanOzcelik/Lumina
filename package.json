@@ -78,6 +78,13 @@
         "description": "JSON File",
         "role": "Editor",
         "icon": "build/document-icon.ico"
+      },
+      {
+        "ext": "pdf",
+        "name": "PDF Document",
+        "description": "PDF File",
+        "role": "Viewer",
+        "icon": "build/document-icon.ico"
       }
     ],
     "nsis": {

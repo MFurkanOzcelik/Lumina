@@ -12,6 +12,36 @@ log.info('App starting...');
 
 let mainWindow;
 let fileToOpen = null;
+let isQuitting = false;
+
+// Single instance lock - prevent multiple instances
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  // Another instance is already running, quit this one
+  app.quit();
+} else {
+  // Handle second instance (when user tries to open another file)
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // Someone tried to run a second instance, focus our window instead
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+      
+      // Check if a file was passed as argument
+      const supportedExtensions = ['.lum', '.txt', '.md', '.json', '.pdf'];
+      const filePath = commandLine.slice(1).find(arg => {
+        const ext = path.extname(arg).toLowerCase();
+        return supportedExtensions.includes(ext) && fs.existsSync(arg);
+      });
+      
+      if (filePath) {
+        log.info('File opened via second instance:', filePath);
+        readAndSendFile(path.resolve(filePath));
+      }
+    }
+  });
+}
 
 function createWindow() {
   // Determine icon path based on environment
@@ -105,6 +135,29 @@ function createWindow() {
     }
   });
 
+  // Handle window close event - Event Ping-Pong Pattern
+  mainWindow.on('close', (event) => {
+    console.log('[MAIN] Close event triggered');
+    log.info('Close event triggered');
+    
+    // Step 2: If already authorized to quit, allow close
+    if (isQuitting) {
+      console.log('[MAIN] isQuitting=true, allowing close');
+      log.info('isQuitting=true, allowing close');
+      return;
+    }
+
+    // Step 3: BLOCK the closing immediately
+    event.preventDefault();
+    console.log('[MAIN] Close prevented, checking for unsaved changes');
+    log.info('Close prevented, checking for unsaved changes');
+
+    // Step 4: Send IPC to Renderer to check unsaved changes
+    mainWindow.webContents.send('check-unsaved-changes');
+    console.log('[MAIN] Sent check-unsaved-changes to renderer');
+    log.info('Sent check-unsaved-changes to renderer');
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -114,7 +167,7 @@ function createWindow() {
 if (process.platform === 'win32' || process.platform === 'linux') {
   // Check if any supported file was passed as argument
   // Skip electron executable and script paths
-  const supportedExtensions = ['.lum', '.txt', '.md', '.json'];
+  const supportedExtensions = ['.lum', '.txt', '.md', '.json', '.pdf'];
   const filePath = process.argv.slice(1).find(arg => {
     const ext = path.extname(arg).toLowerCase();
     return supportedExtensions.includes(ext) && fs.existsSync(arg);
@@ -129,7 +182,7 @@ if (process.platform === 'win32' || process.platform === 'linux') {
 // Handle file opening on macOS (open-file event)
 app.on('open-file', (event, filePath) => {
   event.preventDefault();
-  const supportedExtensions = ['.lum', '.txt', '.md', '.json'];
+  const supportedExtensions = ['.lum', '.txt', '.md', '.json', '.pdf'];
   const ext = path.extname(filePath).toLowerCase();
   
   if (supportedExtensions.includes(ext)) {
@@ -145,16 +198,39 @@ app.on('open-file', (event, filePath) => {
 // Function to read and send file content to renderer
 function readAndSendFile(filePath) {
   try {
-    const content = fs.readFileSync(filePath, 'utf-8');
-    const ext = path.extname(filePath);
+    const ext = path.extname(filePath).toLowerCase();
     const fileName = path.basename(filePath, ext);
+    
+    // For PDF files, send the file path directly (renderer will handle display)
+    if (ext === '.pdf') {
+      if (mainWindow && mainWindow.webContents) {
+        mainWindow.webContents.send('open-external-file', {
+          fileName,
+          content: '', // Empty for PDF
+          filePath,
+          fileType: ext,
+          isPdf: true
+        });
+        
+        // Focus the window
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
+        
+        log.info('PDF file sent to renderer:', filePath);
+      }
+      return;
+    }
+    
+    // For text files, read content
+    const content = fs.readFileSync(filePath, 'utf-8');
     
     if (mainWindow && mainWindow.webContents) {
       mainWindow.webContents.send('open-external-file', {
         fileName,
         content,
         filePath,
-        fileType: ext.toLowerCase()
+        fileType: ext,
+        isPdf: false
       });
       
       // Focus the window
@@ -354,6 +430,97 @@ ipcMain.handle('storage:clearAll', async () => {
 
 ipcMain.handle('storage:getUserDataPath', async () => {
   return userDataPath;
+});
+
+// EVENT PING-PONG PATTERN: Step 3 - Receive unsaved changes status from Renderer
+ipcMain.on('unsaved-changes-status', async (event, data) => {
+  const { isDirty, language } = data;
+  console.log('[MAIN] Received unsaved-changes-status. isDirty:', isDirty, 'language:', language);
+  log.info('Received unsaved-changes-status. isDirty:', isDirty, 'language:', language);
+
+  // Get translations based on language
+  const translations = {
+    en: {
+      title: 'Unsaved Changes',
+      message: 'Do you want to save changes?',
+      detail: 'Your changes will be lost if you don\'t save them.',
+      save: 'Save',
+      dontSave: 'Don\'t Save',
+      cancel: 'Cancel'
+    },
+    tr: {
+      title: 'Kaydedilmemiş Değişiklikler',
+      message: 'Değişiklikler kaydedilsin mi?',
+      detail: 'Kaydetmezseniz yaptığınız değişiklikler kaybolacak.',
+      save: 'Kaydet',
+      dontSave: 'Kaydetme',
+      cancel: 'İptal'
+    }
+  };
+
+  const t = translations[language] || translations.en;
+
+  if (!isDirty) {
+    // No unsaved changes, allow close
+    console.log('[MAIN] No unsaved changes, closing app');
+    log.info('No unsaved changes, closing app');
+    isQuitting = true;
+    mainWindow.close();
+    return;
+  }
+
+  // Unsaved changes exist, show dialog
+  console.log('[MAIN] Unsaved changes detected, showing dialog');
+  log.info('Unsaved changes detected, showing dialog');
+
+  try {
+    const response = await dialog.showMessageBox(mainWindow, {
+      type: 'question',
+      buttons: [t.save, t.dontSave, t.cancel],
+      defaultId: 0,
+      cancelId: 2,
+      title: t.title,
+      message: t.message,
+      detail: t.detail,
+    });
+
+    console.log('[MAIN] User choice:', response.response);
+    log.info('User choice:', response.response);
+
+    if (response.response === 0) {
+      // Save button clicked
+      console.log('[MAIN] User chose to save, sending save-before-quit');
+      log.info('User chose to save, sending save-before-quit');
+      mainWindow.webContents.send('save-before-quit');
+    } else if (response.response === 1) {
+      // Don't Save button clicked
+      console.log('[MAIN] User chose not to save, closing app');
+      log.info('User chose not to save, closing app');
+      isQuitting = true;
+      mainWindow.close();
+    } else {
+      // Cancel button clicked (response === 2)
+      console.log('[MAIN] User cancelled close');
+      log.info('User cancelled close');
+      // Do nothing, window stays open
+    }
+  } catch (error) {
+    console.error('[MAIN] Error showing dialog:', error);
+    log.error('Error showing dialog:', error);
+    // On error, allow close
+    isQuitting = true;
+    mainWindow.close();
+  }
+});
+
+// Handle save completed notification from renderer
+ipcMain.on('save-completed', () => {
+  console.log('[MAIN] Save completed, closing app');
+  log.info('Save completed, closing app');
+  isQuitting = true;
+  if (mainWindow) {
+    mainWindow.close();
+  }
 });
 
 // Export to PDF handler
