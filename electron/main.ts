@@ -49,6 +49,11 @@ function createWindow() {
     win?.show()
   })
 
+  // Clean up window reference when closed
+  win.on('closed', () => {
+    win = null
+  })
+
   // Geliştirme ortamındaysan localhost'u, build alındıysa html dosyasını yükle
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL)
