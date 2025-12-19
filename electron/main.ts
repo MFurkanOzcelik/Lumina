@@ -55,23 +55,26 @@ function createWindow() {
     console.log('[MAIN] Close event triggered, isQuitting:', isQuitting)
     
     if (isQuitting) {
+      console.log('[MAIN] isQuitting is true, allowing close')
       return // Allow close if quitting
     }
 
     // Prevent immediate close
     event.preventDefault()
+    console.log('[MAIN] Close prevented, checking for unsaved changes...')
 
     try {
       // Ask renderer if there are unsaved changes
+      console.log('[MAIN] Executing JavaScript to check unsaved changes...')
       const hasUnsavedChanges = await win?.webContents.executeJavaScript(
         'window.__checkUnsavedChanges ? window.__checkUnsavedChanges() : false'
       )
 
-      console.log('[MAIN] Unsaved changes check result:', hasUnsavedChanges)
+      console.log('[MAIN] Unsaved changes check result:', hasUnsavedChanges, 'type:', typeof hasUnsavedChanges)
 
       if (!hasUnsavedChanges) {
         // No unsaved changes, proceed with close
-        console.log('[MAIN] No unsaved changes, closing app')
+        console.log('[MAIN] No unsaved changes, setting isQuitting=true and closing')
         isQuitting = true
         win?.close()
         return
@@ -80,9 +83,11 @@ function createWindow() {
       // Has unsaved changes - tell renderer to show custom modal
       console.log('[MAIN] Unsaved changes detected, sending show-unsaved-changes-modal to renderer')
       win?.webContents.send('show-unsaved-changes-modal')
+      console.log('[MAIN] Modal signal sent, waiting for user action...')
     } catch (error) {
       console.error('[MAIN] Error handling window close:', error)
       // On error, allow close
+      console.log('[MAIN] Error occurred, forcing close')
       isQuitting = true
       win?.close()
     }
@@ -175,26 +180,33 @@ ipcMain.handle('storage:getUserDataPath', async () => {
 
 // Unsaved Changes Modal Actions
 ipcMain.on('unsaved-changes:save', async () => {
-  console.log('[MAIN] Received unsaved-changes:save')
+  console.log('[MAIN] ========== SAVE BUTTON CLICKED ==========')
   try {
-    // Tell renderer to save changes
+    console.log('[MAIN] Executing save changes...')
     await win?.webContents.executeJavaScript(
       'window.__saveChanges ? window.__saveChanges() : Promise.resolve()'
     )
-    console.log('[MAIN] Save completed, closing app')
-    isQuitting = true
-    win?.close()
+    console.log('[MAIN] Save completed successfully')
   } catch (error) {
     console.error('[MAIN] Error saving before quit:', error)
-    isQuitting = true
-    win?.close()
   }
+  
+  console.log('[MAIN] Setting isQuitting to true')
+  isQuitting = true
+  
+  console.log('[MAIN] Calling app.quit()...')
+  app.quit()
+  console.log('[MAIN] app.quit() called')
 })
 
 ipcMain.on('unsaved-changes:dont-save', () => {
-  console.log('[MAIN] Received unsaved-changes:dont-save, closing without saving')
+  console.log('[MAIN] ========== DONT SAVE BUTTON CLICKED ==========')
+  console.log('[MAIN] Setting isQuitting to true')
   isQuitting = true
-  win?.close()
+  
+  console.log('[MAIN] Calling app.quit()...')
+  app.quit()
+  console.log('[MAIN] app.quit() called')
 })
 
 app.whenReady().then(createWindow)

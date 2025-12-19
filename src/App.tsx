@@ -65,18 +65,30 @@ function App() {
 
   // Handle unsaved changes modal actions
   const handleUnsavedChangesSave = async () => {
-    console.log('[RENDERER] User chose to save');
+    console.log('[RENDERER] ========== SAVE BUTTON CLICKED ==========');
+    console.log('[RENDERER] Closing modal...');
     setShowUnsavedChangesModal(false);
+    console.log('[RENDERER] Checking if electronAPI.unsavedChangesSave exists:', !!window.electronAPI?.unsavedChangesSave);
     if (window.electronAPI?.unsavedChangesSave) {
+      console.log('[RENDERER] Calling unsavedChangesSave()...');
       window.electronAPI.unsavedChangesSave();
+      console.log('[RENDERER] unsavedChangesSave() called');
+    } else {
+      console.error('[RENDERER] electronAPI.unsavedChangesSave is not available!');
     }
   };
 
   const handleUnsavedChangesDontSave = () => {
-    console.log('[RENDERER] User chose not to save');
+    console.log('[RENDERER] ========== DONT SAVE BUTTON CLICKED ==========');
+    console.log('[RENDERER] Closing modal...');
     setShowUnsavedChangesModal(false);
+    console.log('[RENDERER] Checking if electronAPI.unsavedChangesDontSave exists:', !!window.electronAPI?.unsavedChangesDontSave);
     if (window.electronAPI?.unsavedChangesDontSave) {
+      console.log('[RENDERER] Calling unsavedChangesDontSave()...');
       window.electronAPI.unsavedChangesDontSave();
+      console.log('[RENDERER] unsavedChangesDontSave() called');
+    } else {
+      console.error('[RENDERER] electronAPI.unsavedChangesDontSave is not available!');
     }
   };
 
