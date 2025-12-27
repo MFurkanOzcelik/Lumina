@@ -12,6 +12,7 @@
   WriteRegStr HKCU "Software\Classes\.md\OpenWithList\Lumina.exe" "" ""
   WriteRegStr HKCU "Software\Classes\.json\OpenWithList\Lumina.exe" "" ""
   WriteRegStr HKCU "Software\Classes\.lum\OpenWithList\Lumina.exe" "" ""
+  WriteRegStr HKCU "Software\Classes\.pdf\OpenWithList\Lumina.exe" "" ""
   
   ; Add to "Open With" list
   WriteRegStr HKCU "Software\Classes\Applications\Lumina.exe" "FriendlyAppName" "Lumina"
@@ -20,6 +21,7 @@
   WriteRegStr HKCU "Software\Classes\Applications\Lumina.exe\SupportedTypes" ".md" ""
   WriteRegStr HKCU "Software\Classes\Applications\Lumina.exe\SupportedTypes" ".json" ""
   WriteRegStr HKCU "Software\Classes\Applications\Lumina.exe\SupportedTypes" ".lum" ""
+  WriteRegStr HKCU "Software\Classes\Applications\Lumina.exe\SupportedTypes" ".pdf" ""
   
   ; Refresh shell icons
   System::Call 'shell32.dll::SHChangeNotify(i, i, i, i) v (0x08000000, 0, 0, 0)'
@@ -34,6 +36,7 @@
   DeleteRegKey HKCU "Software\Classes\.md\OpenWithList\Lumina.exe"
   DeleteRegKey HKCU "Software\Classes\.json\OpenWithList\Lumina.exe"
   DeleteRegKey HKCU "Software\Classes\.lum\OpenWithList\Lumina.exe"
+  DeleteRegKey HKCU "Software\Classes\.pdf\OpenWithList\Lumina.exe"
   DeleteRegKey HKCU "Software\Classes\Applications\Lumina.exe"
   
   ; Refresh shell icons

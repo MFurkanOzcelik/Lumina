@@ -63,12 +63,55 @@ export const themes = {
   },
 };
 
+const kanbanThemes: Record<Theme, { bg: string; column: string; card: string; text: string; border: string }> = {
+  light: {
+    bg: '#f3f4f6',
+    column: '#e5e7eb',
+    card: '#ffffff',
+    text: '#111827',
+    border: '#d1d5db',
+  },
+  dark: {
+    bg: '#1e1e1e',
+    column: '#2d2d2d',
+    card: '#3e3e3e',
+    text: '#ffffff',
+    border: '#444444',
+  },
+  ocean: {
+    bg: '#0b1726',
+    column: '#0f2539',
+    card: '#103049',
+    text: '#e0f2fe',
+    border: '#0e7490',
+  },
+  sakura: {
+    bg: '#fce7f3',
+    column: '#fbcfe8',
+    card: '#fff7fb',
+    text: '#831843',
+    border: '#f9a8d4',
+  },
+};
+
 export const applyTheme = (theme: Theme) => {
   const colors = themes[theme];
   const root = document.documentElement;
   
+  // Light tema için Kanban değişkenlerini CSS üzerinden override edebilmek adına sınıfı ekle/çıkar
+  root.classList.toggle('light-mode', theme === 'light');
+
   Object.entries(colors).forEach(([key, value]) => {
     root.style.setProperty(`--color-${key}`, value);
   });
+
+  const kanban = kanbanThemes[theme];
+  if (kanban) {
+    root.style.setProperty('--kanban-bg', kanban.bg);
+    root.style.setProperty('--column-bg', kanban.column);
+    root.style.setProperty('--card-bg', kanban.card);
+    root.style.setProperty('--text-primary', kanban.text);
+    root.style.setProperty('--border-color', kanban.border);
+  }
 };
 

@@ -22,6 +22,112 @@ if (!fs.existsSync(USER_DATA_PATH)) {
 
 console.log('User data will be stored in:', USER_DATA_PATH)
 
+// ============================================================================
+// SINGLE INSTANCE LOCK - Prevent multiple app instances
+// ============================================================================
+const gotTheLock = app.requestSingleInstanceLock()
+
+if (!gotTheLock) {
+  // Başka bir örnek çalışıyorsa çık
+  console.log('[MAIN] Another instance is already running. Exiting.')
+  app.quit()
+  process.exit(0)
+}
+
+// İkinci örnek açılmaya çalışırsa, mevcut pencereyi öne getir ve dosyayı aç
+app.on('second-instance', (_event, commandLine) => {
+  console.log('[MAIN] Second instance detected. Focusing primary window.')
+
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+  }
+
+  const filePath = extractFileArg(commandLine)
+  if (filePath) {
+    console.log('[MAIN] Opening file from second instance:', filePath)
+    handleFileOpen(filePath)
+  }
+})
+
+// ============================================================================
+// FILE OPENING HELPER FUNCTION
+// ============================================================================
+function handleFileOpen(filePath) {
+  if (!mainWindow || !fs.existsSync(filePath)) {
+    console.warn('[MAIN] Dosya açılamıyor:', filePath)
+    return
+  }
+
+  try {
+    const fileType = path.extname(filePath).toLowerCase()
+    const fileName = path.basename(filePath, path.extname(filePath))
+    
+    console.log('[MAIN] Dosya renderer\'a gönderiliyor:', fileName, fileType)
+    
+    // PDF dosyaları için özel işlem - dosya yolunu gönder, içeriğini değil
+    if (fileType === '.pdf') {
+      mainWindow.webContents.send('open-external-file', {
+        fileName,
+        content: '',
+        fileType,
+        filePath,
+        isPdf: true
+      })
+      return
+    }
+
+    // .lum dosyaları: içeriği oku ve gönder
+    if (fileType === '.lum') {
+      const content = fs.readFileSync(filePath, 'utf-8')
+
+      mainWindow.webContents.send('open-external-file', {
+        fileName,
+        content,
+        fileType,
+        filePath,
+        isPdf: false
+      })
+
+      // Eski kanal uyumluluğu (varsa)
+      mainWindow.webContents.send('open-lum-file', {
+        fileName,
+        content,
+        filePath
+      })
+      return
+    }
+
+    // Diğer metin tabanlı dosyalar
+    const content = fs.readFileSync(filePath, 'utf-8')
+
+    mainWindow.webContents.send('open-external-file', {
+      fileName,
+      content,
+      fileType,
+      filePath: undefined,
+      isPdf: false
+    })
+  } catch (error) {
+    console.error('[MAIN] Dosya okunurken hata:', error)
+  }
+}
+
+// Komut satırı argümanlarından açılacak dosyayı çıkarır (.lum / .pdf)
+function extractFileArg(argv = []) {
+  for (let i = argv.length - 1; i >= 0; i -= 1) {
+    const arg = argv[i]
+    if (typeof arg !== 'string') continue
+
+    const lower = arg.toLowerCase()
+    const isSupported = lower.endsWith('.lum') || lower.endsWith('.pdf')
+    if (isSupported && fs.existsSync(arg)) {
+      return arg
+    }
+  }
+  return null
+}
+
 function createWindow() {
   const iconPath = process.platform === 'win32' 
     ? path.join(process.env.VITE_PUBLIC || '', 'icon.ico')
@@ -46,6 +152,13 @@ function createWindow() {
     if (mainWindow) {
       mainWindow.maximize()
       mainWindow.show()
+      
+      // Komut satırından gelen ilk dosyayı (pdf/lum) aç
+      const filePath = extractFileArg(process.argv)
+      if (filePath) {
+        console.log('[MAIN] Opening file from startup:', filePath)
+        setTimeout(() => handleFileOpen(filePath), 1000)
+      }
     }
   })
 
@@ -62,6 +175,23 @@ function createWindow() {
     mainWindow.loadFile(path.join(process.env.DIST || '', 'index.html'))
   }
 }
+
+// ============================================================================
+// FILE OPENING - macOS SUPPORT
+// ============================================================================
+app.on('open-file', (event, filePath) => {
+  event.preventDefault()
+  console.log('[MAIN] macOS open-file event:', filePath)
+  
+  if (mainWindow) {
+    handleFileOpen(filePath)
+  } else {
+    // Store file path to open after window is created
+    app.once('ready', () => {
+      setTimeout(() => handleFileOpen(filePath), 1000)
+    })
+  }
+})
 
 // ============================================================================
 // STANDARD ELECTRON LIFECYCLE EVENTS - DO NOT MODIFY

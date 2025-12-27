@@ -18,9 +18,15 @@ interface SidebarProps {
   onResize: (width: number) => void;
   collapsed: boolean;
   onSettingsClick: () => void;
+  expandedFolderIds?: string[];
+  onToggleFolder?: (folderId: string, isOpen: boolean) => void;
+  viewMode: 'editor' | 'kanban';
+  setViewMode: (mode: 'editor' | 'kanban') => void;
+  onNoteSelect?: (noteId: string) => void;
+  onOpenInSplitView?: (noteId: string) => void;
 }
 
-const DraggableNote = ({ noteId, title, isActive, isEncrypted, onClick, onDelete, onRename, onMove, onExport }: any) => {
+const DraggableNote = ({ noteId, title, isActive, isEncrypted, onClick, onDelete, onRename, onMove, onExport, onOpenInSplitView }: any) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -109,6 +115,13 @@ const DraggableNote = ({ noteId, title, isActive, isEncrypted, onClick, onDelete
         onContextMenu={handleContextMenu}
       >
         <div
+          draggable={true}
+          onDragStart={(e: React.DragEvent<HTMLDivElement>) => {
+            // Split Screen için HTML5 drag payload
+            const payload = { id: noteId, title };
+            e.dataTransfer.setData('application/lumina-note', JSON.stringify(payload));
+            e.dataTransfer.effectAllowed = 'copy';
+          }}
           className="px-3 py-2 rounded-lg flex items-center justify-between transition-all"
           style={{
             backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
@@ -175,6 +188,10 @@ const DraggableNote = ({ noteId, title, isActive, isEncrypted, onClick, onDelete
         onDelete={() => setShowDeleteConfirm(true)}
         onMove={onMove}
         onExport={onExport}
+        onOpenInSplitView={() => {
+          onOpenInSplitView?.(noteId);
+          setContextMenu(null);
+        }}
         type="note"
       />
       
@@ -237,13 +254,23 @@ const DraggableNote = ({ noteId, title, isActive, isEncrypted, onClick, onDelete
   );
 };
 
-const DroppableFolder = ({ folderId, name, notes, activeNoteId, isPinned, onNoteClick, onNoteDelete, onFolderDelete, onFolderRename, onNoteRename, onNoteMove, onNoteExport, onTogglePin }: any) => {
-  const [isOpen, setIsOpen] = useState(true);
+const DroppableFolder = ({ folderId, name, notes, activeNoteId, isPinned, onNoteClick, onNoteDelete, onFolderDelete, onFolderRename, onNoteRename, onNoteMove, onNoteExport, onTogglePin, initialOpen = true, onToggle, onOpenInSplitView }: any) => {
+  const [isOpen, setIsOpen] = useState<boolean>(initialOpen ?? true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(name);
   const renameInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync with prop changes
+  useEffect(() => {
+    setIsOpen(initialOpen ?? true);
+  }, [initialOpen]);
+
+  // Notify parent when open state changes
+  useEffect(() => {
+    onToggle?.(folderId, isOpen);
+  }, [isOpen, folderId, onToggle]);
   
   const { setNodeRef, isOver } = useDroppable({
     id: folderId,
@@ -375,6 +402,7 @@ const DroppableFolder = ({ folderId, name, notes, activeNoteId, isPinned, onNote
                 onRename={(newTitle: string) => onNoteRename(note.id, newTitle)}
                 onMove={() => onNoteMove(note.id)}
                 onExport={() => onNoteExport(note.id)}
+                onOpenInSplitView={onOpenInSplitView}
               />
             ))}
             </motion.div>
@@ -441,7 +469,7 @@ const DroppableFolder = ({ folderId, name, notes, activeNoteId, isPinned, onNote
   );
 };
 
-export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: SidebarProps) => {
+export const Sidebar = ({ width, onResize, collapsed, onSettingsClick, expandedFolderIds = [], onToggleFolder, viewMode, setViewMode, onNoteSelect, onOpenInSplitView }: SidebarProps) => {
   const [isResizing, setIsResizing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showFolderInput, setShowFolderInput] = useState(false);
@@ -457,6 +485,16 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
   const { setSidebarCollapsed } = useSettingsStore();
   const language = useSettingsStore((state) => state.language);
   const t = useTranslation(language);
+
+  // Not seçildiğinde - önce onNoteSelect callback'i çağır (otomatik Editor geçişi)
+  // Sonra not seçimini yap
+  const handleNoteClick = (noteId: string) => {
+    if (onNoteSelect) {
+      onNoteSelect(noteId);
+    } else {
+      setActiveNote(noteId);
+    }
+  };
 
   const handleNoteRename = (noteId: string, newTitle: string) => {
     updateNote(noteId, { title: newTitle });
@@ -676,6 +714,38 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
           </span>
         </motion.div>
 
+        {/* Navigation Tabs */}
+        <div className="px-4 pt-2 pb-3 flex gap-2">
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setViewMode('editor')}
+            className="flex-1 px-3 py-2 rounded-lg font-semibold transition-all"
+            style={{
+              backgroundColor: viewMode === 'editor' ? 'var(--color-accent)' : 'var(--color-bgTertiary)',
+              color: viewMode === 'editor' ? 'white' : 'var(--color-text)',
+              border: `1px solid ${viewMode === 'editor' ? 'var(--color-accent)' : 'var(--color-border)'}`,
+            }}
+          >
+            📝 Notlar
+          </motion.button>
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setViewMode('kanban')}
+            className="flex-1 px-3 py-2 rounded-lg font-semibold transition-all"
+            style={{
+              backgroundColor: viewMode === 'kanban' ? 'var(--color-accent)' : 'var(--color-bgTertiary)',
+              color: viewMode === 'kanban' ? 'white' : 'var(--color-text)',
+              border: `1px solid ${viewMode === 'kanban' ? 'var(--color-accent)' : 'var(--color-border)'}`,
+            }}
+          >
+            📋 Pano
+          </motion.button>
+        </div>
+
         {/* Fixed Header: Search Bar */}
         <div className="flex-none px-4 pb-2">
           <div
@@ -871,7 +941,7 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
                   }}
                   onClick={() => {
                     const newNoteId = createNote(null);
-                    setActiveNote(newNoteId);
+                    handleNoteClick(newNoteId);
                   }}
                   className="flex items-center justify-center rounded-lg"
                   style={{ 
@@ -1011,7 +1081,7 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
                     isPinned={folder.isPinned}
                     notes={filteredNotes.filter((note) => note.folderId === folder.id)}
                     activeNoteId={activeNoteId}
-                    onNoteClick={setActiveNote}
+                    onNoteClick={handleNoteClick}
                     onNoteDelete={deleteNote}
                     onFolderDelete={() => deleteFolder(folder.id)}
                     onFolderRename={(newName: string) => handleFolderRename(folder.id, newName)}
@@ -1019,6 +1089,9 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
                     onNoteMove={handleNoteMove}
                     onNoteExport={handleNoteExport}
                     onTogglePin={() => togglePinFolder(folder.id)}
+                    initialOpen={expandedFolderIds.includes(folder.id)}
+                    onToggle={(id: string, open: boolean) => onToggleFolder?.(id, open)}
+                    onOpenInSplitView={onOpenInSplitView}
                   />
                 </motion.div>
               ))}
@@ -1036,11 +1109,12 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
             <DroppableFolderlessArea
               notes={folderlessNotes}
               activeNoteId={activeNoteId}
-              onNoteClick={setActiveNote}
+              onNoteClick={handleNoteClick}
               onNoteDelete={deleteNote}
               onNoteRename={handleNoteRename}
               onNoteMove={handleNoteMove}
               onNoteExport={handleNoteExport}
+              onOpenInSplitView={onOpenInSplitView}
             />
           </div>
         </div>
@@ -1099,7 +1173,7 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick }: Sidebar
   );
 };
 
-const DroppableFolderlessArea = ({ notes, activeNoteId, onNoteClick, onNoteDelete, onNoteRename, onNoteMove, onNoteExport }: any) => {
+const DroppableFolderlessArea = ({ notes, activeNoteId, onNoteClick, onNoteDelete, onNoteRename, onNoteMove, onNoteExport, onOpenInSplitView }: any) => {
   const { setNodeRef, isOver } = useDroppable({
     id: 'folderless',
   });
@@ -1141,6 +1215,7 @@ const DroppableFolderlessArea = ({ notes, activeNoteId, onNoteClick, onNoteDelet
                 onRename={(newTitle: string) => onNoteRename(note.id, newTitle)}
                 onMove={() => onNoteMove(note.id)}
                 onExport={() => onNoteExport(note.id)}
+                onOpenInSplitView={onOpenInSplitView}
               />
             </motion.div>
           ))

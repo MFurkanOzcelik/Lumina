@@ -14,12 +14,17 @@ interface SettingsState {
   sidebarWidth: number;
   sidebarCollapsed: boolean;
   security: SecuritySettings;
+  uiState: {
+    activeNoteId: string | null;
+    expandedFolderIds: string[];
+  };
   isHydrated: boolean;
   hydrate: () => Promise<void>;
   setTheme: (theme: Theme) => void;
   setLanguage: (language: Language) => void;
   setSidebarWidth: (width: number) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  setUiState: (uiState: { activeNoteId: string | null; expandedFolderIds: string[] }) => void;
   setMasterPassword: (passwordHash: string, hint?: string) => void;
   changeMasterPassword: (newPasswordHash: string, hint?: string) => void;
   disableSecurity: () => void;
@@ -35,6 +40,10 @@ const initialState = {
     masterPasswordHash: null,
     passwordHint: null,
     isEnabled: false,
+  },
+  uiState: {
+    activeNoteId: null,
+    expandedFolderIds: [],
   },
 };
 
@@ -76,6 +85,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       sidebarWidth: state.sidebarWidth,
       sidebarCollapsed: state.sidebarCollapsed,
       security: state.security,
+      uiState: state.uiState,
     });
   },
 
@@ -88,6 +98,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       sidebarWidth: state.sidebarWidth,
       sidebarCollapsed: state.sidebarCollapsed,
       security: state.security,
+      uiState: state.uiState,
     });
   },
 
@@ -100,6 +111,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       sidebarWidth: state.sidebarWidth,
       sidebarCollapsed: state.sidebarCollapsed,
       security: state.security,
+      uiState: state.uiState,
     });
   },
 
@@ -112,6 +124,20 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       sidebarWidth: state.sidebarWidth,
       sidebarCollapsed: state.sidebarCollapsed,
       security: state.security,
+      uiState: state.uiState,
+    });
+  },
+
+  setUiState: (uiState) => {
+    set({ uiState });
+    const state = get();
+    debouncedSaveSettings({
+      theme: state.theme,
+      language: state.language,
+      sidebarWidth: state.sidebarWidth,
+      sidebarCollapsed: state.sidebarCollapsed,
+      security: state.security,
+      uiState: state.uiState,
     });
   },
 
@@ -130,6 +156,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       sidebarWidth: state.sidebarWidth,
       sidebarCollapsed: state.sidebarCollapsed,
       security: state.security,
+      uiState: state.uiState,
     });
   },
 
@@ -148,6 +175,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       sidebarWidth: state.sidebarWidth,
       sidebarCollapsed: state.sidebarCollapsed,
       security: state.security,
+      uiState: state.uiState,
     });
   },
 
@@ -166,6 +194,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
       sidebarWidth: state.sidebarWidth,
       sidebarCollapsed: state.sidebarCollapsed,
       security: state.security,
+      uiState: state.uiState,
     });
   },
 

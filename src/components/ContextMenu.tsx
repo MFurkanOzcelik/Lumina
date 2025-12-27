@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Edit2, Trash2, FolderInput, FileDown, Pin, PinOff } from 'lucide-react';
+import { Edit2, Trash2, FolderInput, FileDown, Pin, PinOff, Copy } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
 interface ContextMenuProps {
@@ -11,6 +11,7 @@ interface ContextMenuProps {
   onMove?: () => void;
   onExport?: () => void;
   onTogglePin?: () => void;
+  onOpenInSplitView?: () => void;
   isPinned?: boolean;
   type: 'note' | 'folder';
 }
@@ -24,6 +25,7 @@ export const ContextMenu = ({
   onMove,
   onExport,
   onTogglePin,
+  onOpenInSplitView,
   isPinned,
   type,
 }: ContextMenuProps) => {
@@ -108,6 +110,23 @@ export const ContextMenu = ({
             >
               <FileDown size={16} />
               <span className="text-sm font-medium">Export (.lum)</span>
+            </motion.button>
+          )}
+
+          {/* Open in Split View - Only for notes */}
+          {type === 'note' && onOpenInSplitView && (
+            <motion.button
+              type="button"
+              whileHover={{ backgroundColor: 'var(--color-bgTertiary)' }}
+              onClick={() => {
+                onOpenInSplitView();
+                onClose();
+              }}
+              className="w-full px-4 py-2 text-left flex items-center gap-3 transition-colors"
+              style={{ color: 'var(--color-accent)' }}
+            >
+              <Copy size={16} />
+              <span className="text-sm font-medium">Yan Tarafta Aç</span>
             </motion.button>
           )}
 

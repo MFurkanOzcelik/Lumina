@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useReducer } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bold,
@@ -18,6 +18,8 @@ import {
   FileDown,
   Lock,
   Unlock,
+  Mic,
+  Square,
 } from 'lucide-react';
 import { useNotesStore } from '../store/useNotesStore';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -28,6 +30,7 @@ import { TagInput } from './TagInput';
 import { ExportModal } from './ExportModal';
 import { EncryptedNoteOverlay } from './EncryptedNoteOverlay';
 import { PasswordPromptModal } from './PasswordPromptModal';
+import { ToolbarButton } from './ToolbarButton';
 import TurndownService from 'turndown';
 import hljs from 'highlight.js/lib/core';
 import javascript from 'highlight.js/lib/languages/javascript';
@@ -48,7 +51,7 @@ hljs.registerLanguage('xml', xml);
 hljs.registerLanguage('sql', sql);
 hljs.registerLanguage('csharp', csharp);
 
-export const Editor = () => {
+export const Editor = ({ noteIdOverride }: { noteIdOverride?: string | null } = {}) => {
   const { 
     activeNoteId, 
     notes, 
@@ -64,7 +67,9 @@ export const Editor = () => {
   const sidebarCollapsed = useSettingsStore((state) => state.sidebarCollapsed);
   const t = useTranslation(language);
 
-  const activeNote = notes.find((note) => note.id === activeNoteId);
+  // Use noteIdOverride if provided, otherwise use activeNoteId (for split view support)
+  const effectiveNoteId = noteIdOverride ?? activeNoteId;
+  const activeNote = notes.find((note) => note.id === effectiveNoteId);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -73,15 +78,24 @@ export const Editor = () => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [showFontSize, setShowFontSize] = useState(false);
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
-  const [currentFontSize, setCurrentFontSize] = useState(16);
+  const [currentFontSize, setCurrentFontSize] = useState(() => {
+    const saved = localStorage.getItem('editor-font-size');
+    return saved ? parseInt(saved, 10) : 16;
+  });
   const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const [activeFormats, setActiveFormats] = useState<Set<string>>(new Set());
-  const [activeHeading, setActiveHeading] = useState<string | null>(null); // 'h1', 'h2', 'h3', or null
+  const [, forceUpdate] = useReducer((x) => x + 1, 0); // Toolbar senkronu için render tetikleyici
   const [isEditorFocused, setIsEditorFocused] = useState(false); // Track if editor has focus
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const isRestoringCursor = useRef(false);
+  
+  // Ses özellikleri için state'ler ve ref'ler
+  const [isDictating, setIsDictating] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   
   // Encryption state
   const isNoteEncrypted = activeNote?.isEncrypted || false;
@@ -160,9 +174,9 @@ export const Editor = () => {
 
   // Save cursor position when user interacts with editor
   const saveCursorPosition = () => {
-    if (activeNoteId && !isRestoringCursor.current) {
+    if (effectiveNoteId && !isRestoringCursor.current) {
       const position = getCursorPosition();
-      updateNote(activeNoteId, { cursorPosition: position });
+      updateNote(effectiveNoteId, { cursorPosition: position });
     }
   };
 
@@ -217,7 +231,7 @@ export const Editor = () => {
         }, 100);
       }
     }
-  }, [activeNote?.id, isNoteUnlocked]); // Only trigger on note ID change
+  }, [effectiveNoteId, isNoteUnlocked]); // Only trigger on note ID change
 
   // Auto-dismiss toast after 3 seconds
   useEffect(() => {
@@ -229,30 +243,49 @@ export const Editor = () => {
     }
   }, [toast]);
 
+  // Ses kaydı menülerini dışarıdan tıklayınca kapat
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const menus = document.querySelectorAll('.audio-menu');
+      menus.forEach((menu) => {
+        const button = (menu as HTMLElement).previousElementSibling;
+        if (button && !button.contains(e.target as Node) && !menu.contains(e.target as Node)) {
+          (menu as HTMLElement).style.display = 'none';
+        }
+      });
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
   const handleSave = () => {
-    if (activeNoteId) {
-      updateNote(activeNoteId, { title, content, tags });
+    if (effectiveNoteId) {
+      updateNote(effectiveNoteId, { title, content, tags });
       setShowSaved(true);
       setTimeout(() => setShowSaved(false), 2000);
     }
   };
 
   const handleDelete = () => {
-    if (activeNoteId) {
-      deleteNote(activeNoteId);
+    if (effectiveNoteId) {
+      deleteNote(effectiveNoteId);
       setShowDeleteConfirm(false);
-      setActiveNote(null);
+      // Only clear active note if deleting the main active note
+      if (effectiveNoteId === activeNoteId) {
+        setActiveNote(null);
+      }
     }
   };
 
   // Encryption handlers
   const handleLockNote = () => {
     console.log('[EDITOR] Lock Note clicked');
-    console.log('[EDITOR] Active Note ID:', activeNoteId);
+    console.log('[EDITOR] Effective Note ID:', effectiveNoteId);
     console.log('[EDITOR] Security Enabled:', security.isEnabled);
     console.log('[EDITOR] Master Password Hash exists:', !!security.masterPasswordHash);
     
-    if (!activeNoteId || !security.isEnabled || !security.masterPasswordHash) {
+    if (!effectiveNoteId || !security.isEnabled || !security.masterPasswordHash) {
       console.log('[EDITOR] Cannot lock - missing requirements');
       setToast({ message: t('setMasterPassword'), type: 'error' });
       return;
@@ -264,7 +297,7 @@ export const Editor = () => {
     console.log('[EDITOR] Current title:', title);
     
     // Update the note with current editor content first
-    updateNote(activeNoteId, { title, content, tags });
+    updateNote(effectiveNoteId, { title, content, tags });
     
     // Show password prompt modal
     console.log('[EDITOR] Opening password prompt modal');
@@ -278,8 +311,8 @@ export const Editor = () => {
     // Close the modal
     setShowPasswordPrompt(false);
     
-    if (!activeNoteId) {
-      console.log('[EDITOR] No active note ID');
+    if (!effectiveNoteId) {
+      console.log('[EDITOR] No note ID to encrypt');
       return;
     }
 
@@ -296,7 +329,7 @@ export const Editor = () => {
 
     console.log('[EDITOR] Password verified, encrypting note...');
     // Encrypt the note
-    const success = await encryptNote(activeNoteId, password);
+    const success = await encryptNote(effectiveNoteId, password);
     console.log('[EDITOR] Encryption result:', success);
     
     if (success) {
@@ -317,13 +350,13 @@ export const Editor = () => {
   };
 
   const handleUnlockNote = async (password: string): Promise<boolean> => {
-    if (!activeNoteId) return false;
+    if (!effectiveNoteId) return false;
 
-    const success = await decryptNote(activeNoteId, password);
+    const success = await decryptNote(effectiveNoteId, password);
     if (success) {
       setToast({ message: t('noteDecrypted'), type: 'success' });
       // Refresh the content display
-      const decryptedContent = getDecryptedContent(activeNoteId);
+      const decryptedContent = getDecryptedContent(effectiveNoteId);
       if (decryptedContent) {
         setContent(decryptedContent);
         if (contentRef.current) {
@@ -337,8 +370,8 @@ export const Editor = () => {
   };
 
   const handleLockNoteManually = () => {
-    if (!activeNoteId) return;
-    lockNote(activeNoteId);
+    if (!effectiveNoteId) return;
+    lockNote(effectiveNoteId);
     setContent('');
     if (contentRef.current) {
       contentRef.current.innerHTML = '';
@@ -347,20 +380,411 @@ export const Editor = () => {
 
   // Tag management functions
   const handleAddTag = (tag: string) => {
-    if (!activeNoteId) return;
+    if (!effectiveNoteId) return;
     
     const updatedTags = [...tags, tag];
     setTags(updatedTags);
-    updateNote(activeNoteId, { tags: updatedTags });
+    updateNote(effectiveNoteId, { tags: updatedTags });
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
-    if (!activeNoteId) return;
+    if (!effectiveNoteId) return;
     
     const updatedTags = tags.filter(tag => tag !== tagToRemove);
     setTags(updatedTags);
-    updateNote(activeNoteId, { tags: updatedTags });
+    updateNote(effectiveNoteId, { tags: updatedTags });
   };
+
+  // Türkçe noktalama işaretlerini değiştir ve ilk harfi büyük yap
+  const processDictationText = (text: string): string => {
+    let processed = text;
+
+    // Noktalama işaretlerini değiştir (büyük/küçük harf duyarsız)
+    processed = processed.replace(/\s+nokta\.?/gi, '.');
+    processed = processed.replace(/\s+virgül/gi, ',');
+    processed = processed.replace(/\s+soru\s+işareti/gi, '?');
+    processed = processed.replace(/\s+ünlem/gi, '!');
+    processed = processed.replace(/\s+(yeni|alt)\s+satır/gi, '\n');
+    processed = processed.replace(/\s+iki\s+nokta/gi, ':');
+    processed = processed.replace(/\s+noktalı\s+virgül/gi, ';');
+
+    // Noktalama işaretinden sonra ilk harfi büyük yap
+    processed = processed.replace(/([.?!])\s+([a-zçğıöşü])/g, (_match, punct, letter) => {
+      return `${punct} ${letter.toUpperCase()}`;
+    });
+
+    // Cümle başını büyük harfle başlat
+    if (processed.length > 0) {
+      processed = processed.charAt(0).toUpperCase() + processed.slice(1);
+    }
+
+    return processed;
+  };
+
+  // Dikte başlat/durdur
+  const toggleDictation = () => {
+    if (!('webkitSpeechRecognition' in window)) {
+      setToast({ message: 'Tarayıcınız ses tanımayı desteklemiyor', type: 'error' });
+      return;
+    }
+
+    if (isDictating) {
+      // Durdur
+      console.log('[Dikte] Durduruluyor...');
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsDictating(false);
+    } else {
+      // Başlat
+      console.log('[Dikte] Başlatılıyor...');
+      const SpeechRecognition = (window as any).webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+
+      recognition.lang = 'tr-TR';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        console.log('[Dikte] Başladı');
+        setIsDictating(true);
+        setToast({ message: 'Dikte başladı - konuşmaya başlayın', type: 'success' });
+      };
+
+      recognition.onresult = (event: any) => {
+        console.log('[Dikte] Sonuç alındı, resultIndex:', event.resultIndex);
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          console.log('[Dikte] Transcript:', transcript, 'isFinal:', event.results[i].isFinal);
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript + ' ';
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+
+        // Final transcript varsa noktalama dönüşümü yap ve ekle
+        if (finalTranscript) {
+          console.log('[Dikte] Final transcript:', finalTranscript);
+          const processedText = processDictationText(finalTranscript);
+          console.log('[Dikte] Processed text:', processedText);
+          
+          // ContentEditable'a ekle
+          if (contentRef.current) {
+            // Editöre focus ver
+            contentRef.current.focus();
+
+            const selection = window.getSelection();
+            if (selection) {
+              let range: Range;
+              
+              if (selection.rangeCount > 0) {
+                range = selection.getRangeAt(0);
+              } else {
+                // Eğer selection yoksa, content'in sonuna range oluştur
+                range = document.createRange();
+                range.selectNodeContents(contentRef.current);
+                range.collapse(false); // Sona git
+                selection.addRange(range);
+              }
+
+              range.deleteContents();
+              
+              const textNode = document.createTextNode(processedText);
+              range.insertNode(textNode);
+              
+              // İmleci metnin sonuna taşı
+              range.setStartAfter(textNode);
+              range.collapse(true);
+              selection.removeAllRanges();
+              selection.addRange(range);
+
+              // İçeriği güncelle
+              const newContent = contentRef.current.innerHTML;
+              setContent(newContent);
+              if (effectiveNoteId) {
+                updateNote(effectiveNoteId, { content: newContent });
+              }
+              
+              console.log('[Dikte] Metin eklendi');
+            } else {
+              console.error('[Dikte] Selection alınamadı');
+            }
+          } else {
+            console.error('[Dikte] contentRef bulunamadı');
+          }
+        }
+
+        // Interim sonuçları da göster (opsiyonel - şu an sadece log)
+        if (interimTranscript) {
+          console.log('[Dikte] Interim:', interimTranscript);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('[Dikte] Hata:', event.error);
+        setToast({ message: `Dikte hatası: ${event.error}`, type: 'error' });
+        setIsDictating(false);
+      };
+
+      recognition.onend = () => {
+        console.log('[Dikte] Sona erdi');
+        setIsDictating(false);
+      };
+
+      recognition.start();
+      recognitionRef.current = recognition;
+    }
+  };
+
+  // Ses kaydetme başlat/durdur
+  const toggleRecording = async () => {
+    if (isRecording) {
+      // Kaydı durdur
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+    } else {
+      // Kayıt başlat
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = () => {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const audioId = `audio-${Date.now()}`;
+          const defaultName = `Ses Kaydı ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}`;
+
+          // Blob'u base64'e çevir (kalıcılık için)
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64Audio = reader.result as string;
+
+            // Audio konteyner HTML'i - ayırıcı, başlık, 3 nokta menü ve audio player
+            const audioHTML = `
+              <div class="audio-container" data-audio-id="${audioId}" style="
+                border-top: 2px solid var(--color-border);
+                padding: 1rem 0;
+                margin: 1rem 0;
+                overflow: visible;
+              ">
+                <div style="
+                  display: flex; 
+                  align-items: center; 
+                  justify-content: space-between; 
+                  margin-bottom: 0.5rem;
+                  background: var(--color-surface);
+                  padding: 0.5rem;
+                  border-radius: 6px;
+                ">
+                  <span 
+                    class="audio-title" 
+                    contenteditable="false"
+                    style="
+                      flex: 1;
+                      color: var(--color-text);
+                      font-weight: 600;
+                      font-size: 0.9rem;
+                      padding: 0.25rem 0.5rem;
+                      user-select: none;
+                    "
+                  >${defaultName}</span>
+                  <div style="position: relative; display: inline-block; z-index: 100;">
+                    <button 
+                      class="audio-menu-btn"
+                      onclick="
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const menu = this.nextElementSibling;
+                        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+                      "
+                      style="
+                        background: transparent;
+                        color: var(--color-text);
+                        border: none;
+                        cursor: pointer;
+                        font-size: 1.2rem;
+                        padding: 0.25rem 0.5rem;
+                        line-height: 1;
+                        transition: all 0.2s;
+                      "
+                      onmouseover="this.style.background='var(--color-hover)';"
+                      onmouseout="this.style.background='transparent';"
+                    >⋮</button>
+                    <div 
+                      class="audio-menu" 
+                      style="
+                        display: none;
+                        position: absolute;
+                        right: 0;
+                        top: 100%;
+                        background: var(--color-surface);
+                        border: 1px solid var(--color-border);
+                        border-radius: 6px;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                        min-width: 150px;
+                        z-index: 10000;
+                        margin-top: 4px;
+                        pointer-events: auto;
+                      "
+                    >
+                      <button
+                        onclick="
+                          event.preventDefault();
+                          event.stopPropagation();
+                          const container = this.closest('.audio-container');
+                          const titleSpan = container.querySelector('.audio-title');
+                          const newName = prompt('Yeni isim:', titleSpan.textContent);
+                          if (newName && newName.trim()) {
+                            titleSpan.textContent = newName.trim();
+                            // İçeriği güncelle
+                            const editor = document.querySelector('[contenteditable=true]');
+                            if (editor) {
+                              const event = new Event('input', { bubbles: true });
+                              editor.dispatchEvent(event);
+                            }
+                          }
+                          this.closest('.audio-menu').style.display = 'none';
+                        "
+                        style="
+                          width: 100%;
+                          text-align: left;
+                          padding: 0.6rem 1rem;
+                          background: transparent;
+                          color: var(--color-text);
+                          border: none;
+                          cursor: pointer;
+                          font-size: 0.85rem;
+                          transition: all 0.2s;
+                        "
+                        onmouseover="this.style.background='var(--color-hover)';"
+                        onmouseout="this.style.background='transparent';"
+                      >Yeniden Adlandır</button>
+                      <button
+                        onclick="
+                          event.preventDefault();
+                          event.stopPropagation();
+                          const container = this.closest('.audio-container');
+                          if (confirm('Ses kaydını silmek istediğinizden emin misiniz?')) {
+                            container.remove();
+                            // İçeriği güncelle
+                            const editor = document.querySelector('[contenteditable=true]');
+                            if (editor) {
+                              const event = new Event('input', { bubbles: true });
+                              editor.dispatchEvent(event);
+                            }
+                          }
+                        "
+                        style="
+                          width: 100%;
+                          text-align: left;
+                          padding: 0.6rem 1rem;
+                          background: transparent;
+                          color: var(--color-danger);
+                          border: none;
+                          cursor: pointer;
+                          font-size: 0.85rem;
+                          transition: all 0.2s;
+                          border-top: 1px solid var(--color-border);
+                        "
+                        onmouseover="this.style.background='var(--color-hover)';"
+                        onmouseout="this.style.background='transparent';"
+                      >Sil</button>
+                    </div>
+                  </div>
+                </div>
+                <audio 
+                  controls 
+                  src="${base64Audio}" 
+                  style="
+                    width: 100%;
+                    max-width: 100%;
+                    margin: 0;
+                    border-radius: 8px;
+                  "
+                ></audio>
+              </div>
+            `;
+            
+            if (contentRef.current) {
+              const selection = window.getSelection();
+              if (selection && selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                range.deleteContents();
+
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = audioHTML.trim();
+                const audioContainer = tempDiv.firstChild;
+
+                if (audioContainer) {
+                  // Audio bloğunu ekle
+                  range.insertNode(audioContainer);
+
+                  // Alt satır için boş paragraf ekle ve caret'i oraya taşı
+                  const paragraph = document.createElement('p');
+                  paragraph.appendChild(document.createElement('br'));
+
+                  const parent = audioContainer.parentNode;
+                  if (parent) {
+                    parent.insertBefore(paragraph, audioContainer.nextSibling);
+                  }
+
+                  const caretRange = document.createRange();
+                  caretRange.setStart(paragraph, paragraph.childNodes.length);
+                  caretRange.collapse(true);
+                  selection.removeAllRanges();
+                  selection.addRange(caretRange);
+
+                  const newContent = contentRef.current.innerHTML;
+                  setContent(newContent);
+                  if (effectiveNoteId) {
+                    updateNote(effectiveNoteId, { content: newContent });
+                  }
+                }
+              }
+            }
+          };
+
+          reader.readAsDataURL(audioBlob);
+
+          // Stream'i durdur ve durumu güncelle
+          stream.getTracks().forEach((track) => track.stop());
+          setIsRecording(false);
+          setToast({ message: 'Ses kaydı eklendi', type: 'success' });
+        };
+
+        mediaRecorder.start();
+        setIsRecording(true);
+        setToast({ message: 'Ses kaydediliyor...', type: 'success' });
+      } catch (error) {
+        console.error('Mikrofon erişim hatası:', error);
+        setToast({ message: 'Mikrofon erişimi reddedildi', type: 'error' });
+      }
+    }
+  };
+
+  // Bileşen unmount olduğunda ses işlemlerini temizle
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+    };
+  }, []);
 
   // Export note as .lum (Markdown)
   const handleExportAsLum = () => {
@@ -436,202 +860,220 @@ export const Editor = () => {
     setShowExportModal(true);
   };
 
-  const execCommand = (command: string, value?: string) => {
-    document.execCommand(command, false, value);
-    contentRef.current?.focus();
-  };
-
-  const isCommandActive = (command: string): boolean => {
-    // Map command names to our format keys
-    const formatMap: Record<string, string> = {
-      'bold': 'bold',
-      'italic': 'italic',
-      'underline': 'underline',
-      'strikeThrough': 'strikethrough',
-      'insertUnorderedList': 'ul',
-      'insertOrderedList': 'ol',
-    };
-    
-    const formatKey = formatMap[command] || command;
-    
-    // For lists, also check the actual DOM state
-    if (command === 'insertUnorderedList') {
-      return activeFormats.has('ul') || isInsideList('ul');
-    }
-    if (command === 'insertOrderedList') {
-      return activeFormats.has('ol') || isInsideList('ol');
-    }
-    
-    return activeFormats.has(formatKey);
-  };
-
-  // Helper function to handle format button clicks with immediate feedback
-  const handleFormatClick = (command: string, formatKey: string) => {
-    // Toggle active state immediately
-    const newFormats = new Set(activeFormats);
-    if (newFormats.has(formatKey)) {
-      newFormats.delete(formatKey);
-    } else {
-      newFormats.add(formatKey);
-    }
-    setActiveFormats(newFormats);
-    
-    // Apply the format
-    execCommand(command);
-  };
-
-  // Helper function to check if cursor is inside a list
-  const isInsideList = (listType: 'ul' | 'ol'): boolean => {
+  // Gerçek zamanlı format kontrolü - DOM'u direkt sorgula
+  const checkFormatActive = (formatType: 'bold' | 'italic' | 'underline' | 'strikethrough'): boolean => {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return false;
 
     let node = selection.anchorNode;
     if (!node) return false;
 
-    // Traverse up to find list element
-    while (node && node !== contentRef.current) {
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        const tagName = (node as Element).tagName.toLowerCase();
+    // Text node ise parent'ını al
+    if (node.nodeType === Node.TEXT_NODE) {
+      node = node.parentNode;
+    }
+
+    // Parent chain'de formatın olup olmadığını kontrol et
+    let currentNode: Node | null = node;
+    while (currentNode && currentNode !== contentRef.current) {
+      if (currentNode.nodeType === Node.ELEMENT_NODE) {
+        const element = currentNode as HTMLElement;
+        const tagName = element.tagName.toLowerCase();
+        const style = window.getComputedStyle(element);
+
+        switch (formatType) {
+          case 'bold':
+            if (tagName === 'strong' || tagName === 'b' || parseInt(style.fontWeight) >= 700) {
+              return true;
+            }
+            break;
+          case 'italic':
+            if (tagName === 'em' || tagName === 'i' || style.fontStyle === 'italic') {
+              return true;
+            }
+            break;
+          case 'underline':
+            if (tagName === 'u' || style.textDecoration.includes('underline')) {
+              return true;
+            }
+            break;
+          case 'strikethrough':
+            if (tagName === 's' || tagName === 'strike' || tagName === 'del' || 
+                style.textDecoration.includes('line-through')) {
+              return true;
+            }
+            break;
+        }
+      }
+      currentNode = currentNode.parentNode;
+    }
+
+    return false;
+  };
+
+  // Format butonlarına tıklama - sadece komutu çalıştır, state otomatik güncellenecek
+  const handleFormatClick = (command: string) => {
+    document.execCommand(command, false);
+    contentRef.current?.focus();
+    
+    // İçeriği güncelle
+    if (contentRef.current) {
+      setContent(contentRef.current.innerHTML);
+      if (activeNoteId) {
+        updateNote(activeNoteId, { content: contentRef.current.innerHTML });
+      }
+    }
+    
+    // Format state'ini hemen güncelle
+    updateFormatState();
+  };
+
+  // Liste kontrolü
+  const checkListActive = (listType: 'ul' | 'ol'): boolean => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return false;
+
+    let node = selection.anchorNode;
+    if (!node) return false;
+
+    if (node.nodeType === Node.TEXT_NODE) {
+      node = node.parentNode;
+    }
+
+    let currentNode: Node | null = node;
+    while (currentNode && currentNode !== contentRef.current) {
+      if (currentNode.nodeType === Node.ELEMENT_NODE) {
+        const tagName = (currentNode as Element).tagName.toLowerCase();
         if (tagName === listType) {
           return true;
         }
       }
-      node = node.parentNode;
+      currentNode = currentNode.parentNode;
     }
-    
+
     return false;
   };
 
-  // Helper function to handle list button clicks with proper toggle
+  // Liste butonu tıklama
   const handleListClick = (listType: 'ul' | 'ol') => {
-    const formatKey = listType;
     const command = listType === 'ul' ? 'insertUnorderedList' : 'insertOrderedList';
+    document.execCommand(command, false);
+    contentRef.current?.focus();
     
-    // Check if we're currently in this type of list
-    const isActive = isInsideList(listType);
+    if (contentRef.current) {
+      setContent(contentRef.current.innerHTML);
+      if (activeNoteId) {
+        updateNote(activeNoteId, { content: contentRef.current.innerHTML });
+      }
+    }
+    
+    updateFormatState();
+  };
+
+  // Heading kontrolü
+  const checkHeadingActive = (headingLevel: 'h1' | 'h2' | 'h3'): boolean => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return false;
+
+    let node = selection.anchorNode;
+    if (!node) return false;
+
+    if (node.nodeType === Node.TEXT_NODE) {
+      node = node.parentNode;
+    }
+
+    let currentNode: Node | null = node;
+    while (currentNode && currentNode !== contentRef.current) {
+      if (currentNode.nodeType === Node.ELEMENT_NODE) {
+        const element = currentNode as HTMLElement;
+        if (element.tagName.toLowerCase() === headingLevel) {
+          return true;
+        }
+      }
+      currentNode = currentNode.parentNode;
+    }
+
+    return false;
+  };
+
+  // Heading butonu tıklama
+  const handleHeadingClick = (headingLevel: 'h1' | 'h2' | 'h3') => {
+    const isActive = checkHeadingActive(headingLevel);
     
     if (isActive) {
-      // We're in a list, so unwrap it by toggling the command
-      // This will remove the list formatting
-      document.execCommand(command, false);
-      
-      // Update state to reflect removal
-      const newFormats = new Set(activeFormats);
-      newFormats.delete(formatKey);
-      setActiveFormats(newFormats);
-    } else {
-      // We're not in a list, so apply it
-      document.execCommand(command, false);
-      
-      // Update state to reflect addition
-      const newFormats = new Set(activeFormats);
-      newFormats.add(formatKey);
-      setActiveFormats(newFormats);
-    }
-    
-    contentRef.current?.focus();
-    
-    // Update content state
-    if (contentRef.current) {
-      setContent(contentRef.current.innerHTML);
-    }
-  };
-
-  // Helper function to handle heading clicks with exclusive selection
-  const handleHeadingClick = (headingLevel: 'h1' | 'h2' | 'h3') => {
-    // If clicking the already active heading, revert to paragraph
-    if (activeHeading === headingLevel) {
+      // Aktifse, normal paragrafa dönüştür
       document.execCommand('formatBlock', false, '<p>');
-      setActiveHeading(null);
     } else {
-      // Apply the new heading
+      // Aktif değilse, heading'e dönüştür
       document.execCommand('formatBlock', false, `<${headingLevel}>`);
-      setActiveHeading(headingLevel);
     }
     
     contentRef.current?.focus();
     
-    // Update content state
     if (contentRef.current) {
       setContent(contentRef.current.innerHTML);
+      if (activeNoteId) {
+        updateNote(activeNoteId, { content: contentRef.current.innerHTML });
+      }
     }
+    
+    updateFormatState();
   };
 
-  // Check if a heading is active at cursor position
-  const isHeadingActive = (headingLevel: 'h1' | 'h2' | 'h3'): boolean => {
-    return activeHeading === headingLevel;
+  // Format state'ini güncelle - tüm event'lerde çalışacak
+  const updateFormatState = () => {
+    // React render'ını zorla tetikle
+    forceUpdate();
   };
 
-  // Update active heading and list states based on cursor position
+  // Event listener'ları ekle - HER değişiklikte format state'ini güncelle
   useEffect(() => {
-    const updateFormattingState = () => {
-      const selection = window.getSelection();
-      if (!selection || selection.rangeCount === 0) return;
-
-      let node = selection.anchorNode;
-      if (!node) return;
-
-      let foundHeading = false;
-      let foundUL = false;
-      let foundOL = false;
-      
-      // Traverse up to find heading or list elements
-      let currentNode: Node | null = node;
-      while (currentNode && currentNode !== contentRef.current) {
-        if (currentNode.nodeType === Node.ELEMENT_NODE) {
-          const tagName = (currentNode as Element).tagName.toLowerCase();
-          
-          // Check for headings
-          if (!foundHeading && (tagName === 'h1' || tagName === 'h2' || tagName === 'h3')) {
-            setActiveHeading(tagName as 'h1' | 'h2' | 'h3');
-            foundHeading = true;
-          }
-          
-          // Check for lists
-          if (tagName === 'ul') foundUL = true;
-          if (tagName === 'ol') foundOL = true;
-        }
-        currentNode = currentNode.parentNode;
-      }
-      
-      // Update heading state
-      if (!foundHeading) {
-        setActiveHeading(null);
-      }
-      
-      // Update list states in activeFormats
-      setActiveFormats(prev => {
-        const newFormats = new Set(prev);
-        
-        if (foundUL) {
-          newFormats.add('ul');
-        } else {
-          newFormats.delete('ul');
-        }
-        
-        if (foundOL) {
-          newFormats.add('ol');
-        } else {
-          newFormats.delete('ol');
-        }
-        
-        return newFormats;
-      });
-    };
-
     const contentElement = contentRef.current;
-    if (contentElement) {
-      contentElement.addEventListener('keyup', updateFormattingState);
-      contentElement.addEventListener('mouseup', updateFormattingState);
-      contentElement.addEventListener('focus', updateFormattingState);
-      
-      return () => {
-        contentElement.removeEventListener('keyup', updateFormattingState);
-        contentElement.removeEventListener('mouseup', updateFormattingState);
-        contentElement.removeEventListener('focus', updateFormattingState);
-      };
-    }
+    if (!contentElement) return;
+
+    // Tüm kritik event'leri dinle (klavye kısayolları ve seçim değişimi dahil)
+    const events = [
+      'keydown',
+      'keyup',
+      'mouseup',
+      'click',
+      'focus',
+      'select',
+      'input',
+    ];
+
+    events.forEach(event => {
+      contentElement.addEventListener(event, updateFormatState);
+    });
+
+    // Global seçim değişimini yakala (metin seçimi değiştiğinde)
+    document.addEventListener('selectionchange', updateFormatState);
+
+    // MutationObserver - DOM değişikliklerini yakala
+    const observer = new MutationObserver(updateFormatState);
+    
+    observer.observe(contentElement, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ['style', 'class'],
+    });
+
+    // Cleanup
+    return () => {
+      events.forEach(event => {
+        contentElement.removeEventListener(event, updateFormatState);
+      });
+      document.removeEventListener('selectionchange', updateFormatState);
+      observer.disconnect();
+    };
   }, []);
+
+  // Font boyutu değiştiğinde localStorage'a kaydet
+  useEffect(() => {
+    localStorage.setItem('editor-font-size', currentFontSize.toString());
+  }, [currentFontSize]);
 
   const fontSizes = Array.from({ length: 21 }, (_, i) => i + 10);
 
@@ -971,104 +1413,36 @@ export const Editor = () => {
         >
           <div className="flex items-center gap-2 flex-wrap">
             {/* Bold */}
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onMouseDown={(e) => {
-                e.preventDefault(); // Prevent focus loss from editor
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleFormatClick('bold', 'bold');
-              }}
-              className="p-2 rounded-lg transition-all"
-              style={{
-                backgroundColor: isCommandActive('bold')
-                  ? 'var(--color-accent)'
-                  : 'var(--color-bgTertiary)',
-                color: isCommandActive('bold') ? 'white' : 'var(--color-text)',
-              }}
-              title={t('bold')}
-            >
-              <Bold size={18} />
-            </motion.button>
+            <ToolbarButton
+              icon={Bold}
+              label={t('bold')}
+              isActive={checkFormatActive('bold')}
+              onClick={() => handleFormatClick('bold')}
+            />
 
             {/* Italic */}
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onMouseDown={(e) => {
-                e.preventDefault();
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleFormatClick('italic', 'italic');
-              }}
-              className="p-2 rounded-lg transition-all"
-              style={{
-                backgroundColor: isCommandActive('italic')
-                  ? 'var(--color-accent)'
-                  : 'var(--color-bgTertiary)',
-                color: isCommandActive('italic') ? 'white' : 'var(--color-text)',
-              }}
-              title={t('italic')}
-            >
-              <Italic size={18} />
-            </motion.button>
+            <ToolbarButton
+              icon={Italic}
+              label={t('italic')}
+              isActive={checkFormatActive('italic')}
+              onClick={() => handleFormatClick('italic')}
+            />
 
             {/* Underline */}
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onMouseDown={(e) => {
-                e.preventDefault();
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleFormatClick('underline', 'underline');
-              }}
-              className="p-2 rounded-lg transition-all"
-              style={{
-                backgroundColor: isCommandActive('underline')
-                  ? 'var(--color-accent)'
-                  : 'var(--color-bgTertiary)',
-                color: isCommandActive('underline') ? 'white' : 'var(--color-text)',
-              }}
-              title={t('underline')}
-            >
-              <Underline size={18} />
-            </motion.button>
+            <ToolbarButton
+              icon={Underline}
+              label={t('underline')}
+              isActive={checkFormatActive('underline')}
+              onClick={() => handleFormatClick('underline')}
+            />
 
             {/* Strikethrough */}
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onMouseDown={(e) => {
-                e.preventDefault();
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleFormatClick('strikeThrough', 'strikethrough');
-              }}
-              className="p-2 rounded-lg transition-all"
-              style={{
-                backgroundColor: isCommandActive('strikeThrough')
-                  ? 'var(--color-accent)'
-                  : 'var(--color-bgTertiary)',
-                color: isCommandActive('strikeThrough') ? 'white' : 'var(--color-text)',
-              }}
-              title={t('strikethrough')}
-            >
-              <Strikethrough size={18} />
-            </motion.button>
+            <ToolbarButton
+              icon={Strikethrough}
+              label={t('strikethrough')}
+              isActive={checkFormatActive('strikethrough')}
+              onClick={() => handleFormatClick('strikeThrough')}
+            />
 
             <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
 
@@ -1151,12 +1525,14 @@ export const Editor = () => {
                 e.stopPropagation();
                 handleHeadingClick('h1');
               }}
-              className="px-3 py-2 rounded-lg transition-all font-bold text-sm"
+              className={`toolbar-btn px-3 py-2 rounded-lg transition-all font-bold text-sm ${
+                checkHeadingActive('h1') ? 'is-active' : ''
+              }`}
               style={{
-                backgroundColor: isHeadingActive('h1')
+                backgroundColor: checkHeadingActive('h1')
                   ? 'var(--color-accent)'
                   : 'var(--color-bgTertiary)',
-                color: isHeadingActive('h1') ? 'white' : 'var(--color-text)',
+                color: checkHeadingActive('h1') ? 'white' : 'var(--color-text)',
               }}
               title="Heading 1"
             >
@@ -1176,12 +1552,14 @@ export const Editor = () => {
                 e.stopPropagation();
                 handleHeadingClick('h2');
               }}
-              className="px-3 py-2 rounded-lg transition-all font-bold text-sm"
+              className={`toolbar-btn px-3 py-2 rounded-lg transition-all font-bold text-sm ${
+                checkHeadingActive('h2') ? 'is-active' : ''
+              }`}
               style={{
-                backgroundColor: isHeadingActive('h2')
+                backgroundColor: checkHeadingActive('h2')
                   ? 'var(--color-accent)'
                   : 'var(--color-bgTertiary)',
-                color: isHeadingActive('h2') ? 'white' : 'var(--color-text)',
+                color: checkHeadingActive('h2') ? 'white' : 'var(--color-text)',
               }}
               title="Heading 2"
             >
@@ -1201,12 +1579,14 @@ export const Editor = () => {
                 e.stopPropagation();
                 handleHeadingClick('h3');
               }}
-              className="px-3 py-2 rounded-lg transition-all font-bold text-sm"
+              className={`toolbar-btn px-3 py-2 rounded-lg transition-all font-bold text-sm ${
+                checkHeadingActive('h3') ? 'is-active' : ''
+              }`}
               style={{
-                backgroundColor: isHeadingActive('h3')
+                backgroundColor: checkHeadingActive('h3')
                   ? 'var(--color-accent)'
                   : 'var(--color-bgTertiary)',
-                color: isHeadingActive('h3') ? 'white' : 'var(--color-text)',
+                color: checkHeadingActive('h3') ? 'white' : 'var(--color-text)',
               }}
               title="Heading 3"
             >
@@ -1216,58 +1596,20 @@ export const Editor = () => {
             <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
 
             {/* Bullet List */}
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onMouseDown={(e) => {
-                e.preventDefault();
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleListClick('ul');
-              }}
-              className="p-2 rounded-lg transition-all"
-              style={{
-                backgroundColor: isCommandActive('insertUnorderedList')
-                  ? 'var(--color-accent)'
-                  : 'var(--color-bgTertiary)',
-                color: isCommandActive('insertUnorderedList')
-                  ? 'white'
-                  : 'var(--color-text)',
-              }}
-              title={t('bulletList')}
-            >
-              <List size={18} />
-            </motion.button>
+            <ToolbarButton
+              icon={List}
+              label={t('bulletList')}
+              isActive={checkListActive('ul')}
+              onClick={() => handleListClick('ul')}
+            />
 
             {/* Numbered List */}
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onMouseDown={(e) => {
-                e.preventDefault();
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleListClick('ol');
-              }}
-              className="p-2 rounded-lg transition-all"
-              style={{
-                backgroundColor: isCommandActive('insertOrderedList')
-                  ? 'var(--color-accent)'
-                  : 'var(--color-bgTertiary)',
-                color: isCommandActive('insertOrderedList')
-                  ? 'white'
-                  : 'var(--color-text)',
-              }}
-              title={t('numberedList')}
-            >
-              <ListOrdered size={18} />
-            </motion.button>
+            <ToolbarButton
+              icon={ListOrdered}
+              label={t('numberedList')}
+              isActive={checkListActive('ol')}
+              onClick={() => handleListClick('ol')}
+            />
 
             <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
 
@@ -1297,6 +1639,70 @@ export const Editor = () => {
               title={isEditorFocused ? "Code Block" : "Focus editor to use Code Block"}
             >
               <Code size={18} />
+            </motion.button>
+
+            <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
+
+            {/* Dikte Butonu */}
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={toggleDictation}
+              className="p-2 rounded-lg transition-all relative"
+              style={{
+                backgroundColor: isDictating ? '#ef4444' : 'var(--color-bgTertiary)',
+                color: isDictating ? 'white' : 'var(--color-text)',
+              }}
+              title={isDictating ? 'Dikteyi Durdur' : 'Dikte Başlat'}
+            >
+              <Mic size={18} />
+              {isDictating && (
+                <motion.div
+                  className="absolute inset-0 rounded-lg"
+                  animate={{
+                    boxShadow: [
+                      '0 0 0 0 rgba(239, 68, 68, 0.7)',
+                      '0 0 0 10px rgba(239, 68, 68, 0)',
+                    ],
+                  }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                  }}
+                />
+              )}
+            </motion.button>
+
+            {/* Ses Kaydetme Butonu */}
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={toggleRecording}
+              className="p-2 rounded-lg transition-all relative"
+              style={{
+                backgroundColor: isRecording ? '#ef4444' : 'var(--color-bgTertiary)',
+                color: isRecording ? 'white' : 'var(--color-text)',
+              }}
+              title={isRecording ? 'Kaydı Durdur' : 'Ses Kaydet'}
+            >
+              <Square size={18} fill={isRecording ? 'white' : 'none'} />
+              {isRecording && (
+                <motion.div
+                  className="absolute inset-0 rounded-lg"
+                  animate={{
+                    boxShadow: [
+                      '0 0 0 0 rgba(239, 68, 68, 0.7)',
+                      '0 0 0 10px rgba(239, 68, 68, 0)',
+                    ],
+                  }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                  }}
+                />
+              )}
             </motion.button>
           </div>
 
@@ -1947,6 +2353,27 @@ export const Editor = () => {
                         }
                       }
                     }
+                  } else {
+                    // Normal text (not in list or code block) - Clear inline formatting after Enter
+                    // Kullanıcı Enter bastığında, seçili araçların formatını kaldırması için
+                    // Scheduling to next tick ensures the newline is created first
+                    setTimeout(() => {
+                      const inlineFormats = ['bold', 'italic', 'underline', 'strikethrough'];
+                      inlineFormats.forEach(format => {
+                        const commandMap: Record<string, string> = {
+                          'bold': 'bold',
+                          'italic': 'italic',
+                          'underline': 'underline',
+                          'strikethrough': 'strikeThrough'
+                        };
+                        const cmd = commandMap[format];
+
+                        // Sadece aktifse kapat
+                        if (document.queryCommandState(cmd)) {
+                          document.execCommand(cmd, false);
+                        }
+                      });
+                    }, 0);
                   }
                 }
               }}
