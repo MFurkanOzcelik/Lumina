@@ -109,7 +109,7 @@ export const ContextMenu = ({
               style={{ color: 'var(--color-text)' }}
             >
               <FileDown size={16} />
-              <span className="text-sm font-medium">Export (.lum)</span>
+              <span className="text-sm font-medium">Export</span>
             </motion.button>
           )}
 

@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, globalShortcut } = require('electron')
+const { autoUpdater } = require('electron-updater')
 const path = require('path')
 const fs = require('fs')
 
@@ -224,6 +225,28 @@ app.whenReady().then(() => {
   })
   
   console.log('[MAIN] ✅ App ready. Force quit shortcut: Ctrl+Shift+Q')
+
+  // Configure auto-updater
+  try {
+    autoUpdater.autoDownload = true
+    autoUpdater.on('update-available', (info) => {
+      if (mainWindow) mainWindow.webContents.send('update-available', info)
+    })
+    autoUpdater.on('update-downloaded', (info) => {
+      if (mainWindow) mainWindow.webContents.send('update-downloaded', info)
+    })
+    autoUpdater.on('download-progress', (progress) => {
+      if (mainWindow) mainWindow.webContents.send('download-progress', progress)
+    })
+    autoUpdater.on('error', (err) => {
+      if (mainWindow) mainWindow.webContents.send('update-error', String(err))
+    })
+    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+      console.warn('[MAIN] autoUpdater check error:', err)
+    })
+  } catch (e) {
+    console.warn('[MAIN] autoUpdater init failed:', e)
+  }
 })
 
 // Unregister shortcuts on quit
@@ -300,5 +323,21 @@ ipcMain.handle('storage:clearAll', async () => {
 
 ipcMain.handle('storage:getUserDataPath', async () => {
   return USER_DATA_PATH
+})
+
+// ============================================================================
+// MISC IPC HANDLERS (App Info, Updater)
+// ============================================================================
+
+ipcMain.handle('get-app-version', async () => app.getVersion())
+ipcMain.handle('get-app-path', async () => app.getAppPath())
+ipcMain.handle('install-update', async () => {
+  try {
+    autoUpdater.quitAndInstall()
+    return true
+  } catch (e) {
+    console.error('[MAIN] install-update error:', e)
+    return false
+  }
 })
 

@@ -640,6 +640,14 @@ input[type="text"]::placeholder {
   cursor: grabbing;
 }
 
+/* Sürükleme sırasında kart nötr kalsın; vurguyu sütun alır */
+.kanban-card.dragging {
+  opacity: 0.6;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
 .kanban-drag-handle {
   display: flex;
   align-items: center;
@@ -679,6 +687,12 @@ input[type="text"]::placeholder {
   display: flex;
   gap: 0.25rem;
   flex-shrink: 0;
+}
+
+/* Sürüklenen kartın üzerine gelinen sütunu vurgula */
+.drag-over-column {
+  border: 2px dashed #00d4ff !important;
+  transition: border-color 0.15s ease;
 }
 
 /* Sütun Ekle Placeholder */

@@ -1,4 +1,6 @@
-import { useState, useRef, useEffect, useReducer } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+// @ts-ignore html2pdf.js için tip bulunmuyor
+import html2pdf from 'html2pdf.js';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bold,
@@ -83,9 +85,14 @@ export const Editor = ({ noteIdOverride }: { noteIdOverride?: string | null } = 
     return saved ? parseInt(saved, 10) : 16;
   });
   const [fileUrl, setFileUrl] = useState<string | null>(null);
-  const [, forceUpdate] = useReducer((x) => x + 1, 0); // Toolbar senkronu için render tetikleyici
   const [isEditorFocused, setIsEditorFocused] = useState(false); // Track if editor has focus
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [activeFormats, setActiveFormats] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+    strikethrough: false,
+  });
   const contentRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const isRestoringCursor = useRef(false);
@@ -101,20 +108,55 @@ export const Editor = ({ noteIdOverride }: { noteIdOverride?: string | null } = 
   const isNoteEncrypted = activeNote?.isEncrypted || false;
   const isNoteUnlocked = activeNote ? getDecryptedContent(activeNote.id) !== null : false;
 
-  // Create and cleanup file URL for attachments
+  // Ekli dosya için URL oluşturma ve temizleme (güvenli)
   useEffect(() => {
-    if (activeNote?.attachment?.blob) {
-      const url = URL.createObjectURL(activeNote.attachment.blob);
-      setFileUrl(url);
-      
-      return () => {
-        URL.revokeObjectURL(url);
-        setFileUrl(null);
-      };
-    } else {
-      setFileUrl(null);
+    let url: string | null = null;
+
+    const fileLike: any = activeNote?.attachment?.blob as any;
+
+    const toFileUrl = (p: string) => (p?.startsWith('file://') ? p : `file:///${p.replace(/\\/g, '/')}`);
+
+    try {
+      if (fileLike) {
+        if (typeof Blob !== 'undefined' && (fileLike instanceof Blob || fileLike instanceof File)) {
+          url = URL.createObjectURL(fileLike);
+        } else if (typeof fileLike === 'string') {
+          url = fileLike;
+        } else if (fileLike && typeof fileLike === 'object' && 'path' in fileLike && typeof fileLike.path === 'string') {
+          url = toFileUrl(fileLike.path);
+        } else {
+          console.warn('[Editor] Geçersiz attachment.blob türü – atlanıyor:', fileLike);
+        }
+      }
+    } catch (err) {
+      console.error('[Editor] createObjectURL hatası:', err);
+      url = null;
     }
+
+    setFileUrl(url);
+
+    return () => {
+      if (url && url.startsWith('blob:')) {
+        try { URL.revokeObjectURL(url); } catch {}
+      }
+      setFileUrl(null);
+    };
   }, [activeNote?.attachment]);
+
+  // Toolbar durumunu gerçek imleç durumuna göre eşitle
+  const syncToolbarState = useCallback(() => {
+    setActiveFormats({
+      bold: document.queryCommandState('bold'),
+      italic: document.queryCommandState('italic'),
+      underline: document.queryCommandState('underline'),
+      strikethrough: document.queryCommandState('strikeThrough'),
+    });
+  }, []);
+
+  // İlk yüklemede toolbar durumunu oku
+  useEffect(() => {
+    syncToolbarState();
+  }, [syncToolbarState]);
 
   // Helper function to get cursor position in contentEditable
   const getCursorPosition = (): number => {
@@ -837,83 +879,39 @@ export const Editor = ({ noteIdOverride }: { noteIdOverride?: string | null } = 
     URL.revokeObjectURL(url);
   };
 
-  // Export note as PDF
-  const handleExportAsPdf = async () => {
-    if (!activeNote || !window.electronAPI?.exportToPdf) return;
-
-    try {
-      const result = await window.electronAPI.exportToPdf(title || 'Untitled Note', content);
-      
-      if (result.success) {
-        setShowSaved(true);
-        setTimeout(() => setShowSaved(false), 2000);
-      } else if (!result.canceled) {
-        console.error('PDF export failed:', result.error);
-      }
-    } catch (error) {
-      console.error('Error exporting to PDF:', error);
+  // PDF dışa aktarımı (html2pdf.js)
+  const handleExportAsPdf = useCallback(() => {
+    const element = document.getElementById('editor-content');
+    if (!element) {
+      alert('PDF oluşturulamadı: içerik bulunamadı.');
+      return;
     }
-  };
+
+    const opt = {
+      margin: 10,
+      filename: `${title || 'Untitled Note'}.pdf`,
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
+    };
+
+    html2pdf().set(opt).from(element).save();
+  }, [title]);
 
   // Open export modal
   const handleExportNote = () => {
     setShowExportModal(true);
   };
 
-  // Gerçek zamanlı format kontrolü - DOM'u direkt sorgula
+  // Toolbar butonları için aktiflik kontrolü
   const checkFormatActive = (formatType: 'bold' | 'italic' | 'underline' | 'strikethrough'): boolean => {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return false;
-
-    let node = selection.anchorNode;
-    if (!node) return false;
-
-    // Text node ise parent'ını al
-    if (node.nodeType === Node.TEXT_NODE) {
-      node = node.parentNode;
-    }
-
-    // Parent chain'de formatın olup olmadığını kontrol et
-    let currentNode: Node | null = node;
-    while (currentNode && currentNode !== contentRef.current) {
-      if (currentNode.nodeType === Node.ELEMENT_NODE) {
-        const element = currentNode as HTMLElement;
-        const tagName = element.tagName.toLowerCase();
-        const style = window.getComputedStyle(element);
-
-        switch (formatType) {
-          case 'bold':
-            if (tagName === 'strong' || tagName === 'b' || parseInt(style.fontWeight) >= 700) {
-              return true;
-            }
-            break;
-          case 'italic':
-            if (tagName === 'em' || tagName === 'i' || style.fontStyle === 'italic') {
-              return true;
-            }
-            break;
-          case 'underline':
-            if (tagName === 'u' || style.textDecoration.includes('underline')) {
-              return true;
-            }
-            break;
-          case 'strikethrough':
-            if (tagName === 's' || tagName === 'strike' || tagName === 'del' || 
-                style.textDecoration.includes('line-through')) {
-              return true;
-            }
-            break;
-        }
-      }
-      currentNode = currentNode.parentNode;
-    }
-
-    return false;
+    return activeFormats[formatType];
   };
 
-  // Format butonlarına tıklama - sadece komutu çalıştır, state otomatik güncellenecek
+  // Format butonlarına tıklama - komut sonrası anında senkronize et
   const handleFormatClick = (command: string) => {
     document.execCommand(command, false);
+    syncToolbarState(); // Tıklama sonrası butonu anında güncelle
     contentRef.current?.focus();
     
     // İçeriği güncelle
@@ -923,9 +921,6 @@ export const Editor = ({ noteIdOverride }: { noteIdOverride?: string | null } = 
         updateNote(activeNoteId, { content: contentRef.current.innerHTML });
       }
     }
-    
-    // Format state'ini hemen güncelle
-    updateFormatState();
   };
 
   // Liste kontrolü
@@ -966,8 +961,8 @@ export const Editor = ({ noteIdOverride }: { noteIdOverride?: string | null } = 
         updateNote(activeNoteId, { content: contentRef.current.innerHTML });
       }
     }
-    
-    updateFormatState();
+
+    syncToolbarState();
   };
 
   // Heading kontrolü
@@ -1017,58 +1012,25 @@ export const Editor = ({ noteIdOverride }: { noteIdOverride?: string | null } = 
       }
     }
     
-    updateFormatState();
+    syncToolbarState();
   };
 
-  // Format state'ini güncelle - tüm event'lerde çalışacak
-  const updateFormatState = () => {
-    // React render'ını zorla tetikle
-    forceUpdate();
-  };
-
-  // Event listener'ları ekle - HER değişiklikte format state'ini güncelle
+  // Event listener'ları ekle - seçim ve tuş hareketlerinde toolbar senkronu
   useEffect(() => {
     const contentElement = contentRef.current;
     if (!contentElement) return;
 
-    // Tüm kritik event'leri dinle (klavye kısayolları ve seçim değişimi dahil)
-    const events = [
-      'keydown',
-      'keyup',
-      'mouseup',
-      'click',
-      'focus',
-      'select',
-      'input',
-    ];
+    const handleSync = () => syncToolbarState();
 
-    events.forEach(event => {
-      contentElement.addEventListener(event, updateFormatState);
-    });
+    const events = ['keyup', 'mouseup', 'click'];
+    events.forEach((event) => contentElement.addEventListener(event, handleSync));
+    document.addEventListener('selectionchange', handleSync);
 
-    // Global seçim değişimini yakala (metin seçimi değiştiğinde)
-    document.addEventListener('selectionchange', updateFormatState);
-
-    // MutationObserver - DOM değişikliklerini yakala
-    const observer = new MutationObserver(updateFormatState);
-    
-    observer.observe(contentElement, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-      attributes: true,
-      attributeFilter: ['style', 'class'],
-    });
-
-    // Cleanup
     return () => {
-      events.forEach(event => {
-        contentElement.removeEventListener(event, updateFormatState);
-      });
-      document.removeEventListener('selectionchange', updateFormatState);
-      observer.disconnect();
+      events.forEach((event) => contentElement.removeEventListener(event, handleSync));
+      document.removeEventListener('selectionchange', handleSync);
     };
-  }, []);
+  }, [syncToolbarState]);
 
   // Font boyutu değiştiğinde localStorage'a kaydet
   useEffect(() => {
@@ -1763,7 +1725,7 @@ export const Editor = ({ noteIdOverride }: { noteIdOverride?: string | null } = 
                 color: 'var(--color-text)',
                 border: `1px solid var(--color-border)`,
               }}
-              title="Export as .lum file"
+              title="Export"
             >
               <FileDown size={18} />
               Export
@@ -1921,22 +1883,42 @@ export const Editor = ({ noteIdOverride }: { noteIdOverride?: string | null } = 
                 {/* File Preview (for PDFs and text files) */}
                 {activeNote.attachment.type === 'application/pdf' && (
                   <div className="flex-1 w-full h-full" style={{ minHeight: 'calc(100vh - 250px)' }}>
-                    <iframe
-                      src={fileUrl}
-                      className="w-full h-full border-none"
-                      title={activeNote.attachment.name}
-                      style={{ display: 'block', minHeight: 'calc(100vh - 250px)' }}
-                    />
+                    {fileUrl ? (
+                      <iframe
+                        key={fileUrl || `${activeNote.id}-pdf`}
+                        src={fileUrl}
+                        className="w-full h-full border-none"
+                        title={activeNote.attachment.name}
+                        style={{ display: 'block', minHeight: 'calc(100vh - 250px)' }}
+                      />
+                    ) : (
+                      <div
+                        className="w-full h-full flex items-center justify-center text-sm"
+                        style={{ color: 'var(--color-textSecondary)' }}
+                      >
+                        Dosya bulunamadı veya geçersiz dosya biçimi.
+                      </div>
+                    )}
                   </div>
                 )}
                 {activeNote.attachment.type.startsWith('text/') && (
                   <div className="flex-1 w-full h-full" style={{ minHeight: 'calc(100vh - 250px)' }}>
-                    <iframe
-                      src={fileUrl}
-                      className="w-full h-full border-none"
-                      title={activeNote.attachment.name}
-                      style={{ display: 'block', minHeight: 'calc(100vh - 250px)' }}
-                    />
+                    {fileUrl ? (
+                      <iframe
+                        key={fileUrl || `${activeNote.id}-text`}
+                        src={fileUrl}
+                        className="w-full h-full border-none"
+                        title={activeNote.attachment.name}
+                        style={{ display: 'block', minHeight: 'calc(100vh - 250px)' }}
+                      />
+                    ) : (
+                      <div
+                        className="w-full h-full flex items-center justify-center text-sm"
+                        style={{ color: 'var(--color-textSecondary)' }}
+                      >
+                        Dosya bulunamadı veya geçersiz dosya biçimi.
+                      </div>
+                    )}
                   </div>
                 )}
               </motion.div>
@@ -1946,6 +1928,7 @@ export const Editor = ({ noteIdOverride }: { noteIdOverride?: string | null } = 
           {/* Content Editor */}
           <div className="px-6 pb-6 pt-4">
             <div
+              id="editor-content"
               ref={contentRef}
               contentEditable
               className="editor-content min-h-full outline-none"
@@ -1972,6 +1955,9 @@ export const Editor = ({ noteIdOverride }: { noteIdOverride?: string | null } = 
                 if (activeNoteId) {
                   updateNote(activeNoteId, { content: newContent });
                 }
+                
+                // Biçim durumunu hemen güncelle
+                syncToolbarState();
                 
                 // Handle inline markdown formatting (**bold**, *italic*, ~~strikethrough~~, `code`)
                 const selection = window.getSelection();
@@ -2355,30 +2341,37 @@ export const Editor = ({ noteIdOverride }: { noteIdOverride?: string | null } = 
                     }
                   } else {
                     // Normal text (not in list or code block) - Clear inline formatting after Enter
-                    // Kullanıcı Enter bastığında, seçili araçların formatını kaldırması için
-                    // Scheduling to next tick ensures the newline is created first
-                    setTimeout(() => {
-                      const inlineFormats = ['bold', 'italic', 'underline', 'strikethrough'];
-                      inlineFormats.forEach(format => {
-                        const commandMap: Record<string, string> = {
-                          'bold': 'bold',
-                          'italic': 'italic',
-                          'underline': 'underline',
-                          'strikethrough': 'strikeThrough'
-                        };
-                        const cmd = commandMap[format];
+                    // Kullanıcı Enter bastığında, seçili araçların formatını hemen kapat
+                    requestAnimationFrame(() => {
+                      const inlineFormats: Array<{ key: keyof typeof activeFormats; cmd: string }> = [
+                        { key: 'bold', cmd: 'bold' },
+                        { key: 'italic', cmd: 'italic' },
+                        { key: 'underline', cmd: 'underline' },
+                        { key: 'strikethrough', cmd: 'strikeThrough' },
+                      ];
 
-                        // Sadece aktifse kapat
+                      inlineFormats.forEach(({ cmd }) => {
                         if (document.queryCommandState(cmd)) {
                           document.execCommand(cmd, false);
                         }
                       });
-                    }, 0);
+
+                      syncToolbarState();
+                    });
                   }
                 }
               }}
-              onMouseUp={saveCursorPosition}
-              onKeyUp={saveCursorPosition}
+              onMouseUp={() => {
+                syncToolbarState();
+                saveCursorPosition();
+              }}
+              onKeyUp={() => {
+                syncToolbarState();
+                saveCursorPosition();
+              }}
+              onClick={() => {
+                syncToolbarState();
+              }}
               suppressContentEditableWarning
             />
           </div>

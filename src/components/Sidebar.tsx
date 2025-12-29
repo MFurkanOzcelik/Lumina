@@ -12,6 +12,8 @@ import { ExportModal } from './ExportModal';
 import TurndownService from 'turndown';
 import { getTagColor } from '../utils/tagUtils';
 import './Sidebar.css';
+// @ts-ignore html2pdf.js için tip bulunmuyor
+import html2pdf from 'html2pdf.js';
 
 interface SidebarProps {
   width: number;
@@ -563,30 +565,28 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick, expandedF
     URL.revokeObjectURL(url);
   };
 
-  const handleExportAsPdf = async (noteId: string) => {
+  const handleExportAsPdf = (noteId: string) => {
     const note = notes.find((n) => n.id === noteId);
-    if (!note) return;
-
-    if (window.electronAPI?.exportToPdf) {
-      try {
-        const result = await window.electronAPI.exportToPdf(
-          note.title || 'Untitled Note',
-          note.content
-        );
-        
-        if (result.success) {
-          console.log('PDF exported successfully:', result.filePath);
-        } else if (!result.canceled) {
-          console.error('PDF export failed:', result.error);
-          alert('Failed to export PDF: ' + result.error);
-        }
-      } catch (error) {
-        console.error('Error exporting PDF:', error);
-        alert('Failed to export PDF. Please try again.');
-      }
-    } else {
-      alert('PDF export is only available in the desktop app.');
+    if (!note) {
+      alert('PDF oluşturulamadı: not bulunamadı.');
+      return;
     }
+
+    const element = document.getElementById('editor-content');
+    if (!element) {
+      alert('PDF oluşturulamadı: içerik bulunamadı.');
+      return;
+    }
+
+    const opt = {
+      margin: 10,
+      filename: `${note.title || 'Untitled Note'}.pdf`,
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
+    };
+
+    html2pdf().set(opt).from(element).save();
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {

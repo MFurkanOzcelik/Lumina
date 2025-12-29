@@ -25,7 +25,7 @@ export const ExportModal = ({
         </p>
 
         <div className="grid grid-cols-1 gap-3">
-          {/* Export as .lum */}
+          {/* Export */}
           <motion.button
             type="button"
             whileHover={{ scale: 1.02, x: 4 }}
@@ -56,7 +56,7 @@ export const ExportModal = ({
                 className="font-semibold text-base mb-1"
                 style={{ color: 'var(--color-text)' }}
               >
-                Export as .lum
+                Export (.lum)
               </h3>
               <p
                 className="text-xs"

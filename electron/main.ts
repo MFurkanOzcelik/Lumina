@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import path from 'path'
 import fs from 'fs'
 
@@ -22,6 +23,69 @@ if (!fs.existsSync(USER_DATA_PATH)) {
 
 console.log('User data will be stored in:', USER_DATA_PATH)
 
+function handleFileOpen(filePath: string) {
+  if (!mainWindow || !fs.existsSync(filePath)) {
+    console.warn('[MAIN] Dosya açılamıyor:', filePath)
+    return
+  }
+
+  try {
+    const fileType = path.extname(filePath).toLowerCase()
+    const fileName = path.basename(filePath, path.extname(filePath))
+
+    console.log('[MAIN] Dosya renderer\'a gönderiliyor:', fileName, fileType)
+
+    if (fileType === '.pdf') {
+      mainWindow.webContents.send('open-external-file', {
+        fileName,
+        content: '',
+        fileType,
+        filePath,
+        isPdf: true,
+      })
+      return
+    }
+
+    if (fileType === '.lum') {
+      const content = fs.readFileSync(filePath, 'utf-8')
+      mainWindow.webContents.send('open-external-file', {
+        fileName,
+        content,
+        fileType,
+        filePath,
+        isPdf: false,
+      })
+      // Eski kanal uyumluluğu
+      mainWindow.webContents.send('open-lum-file', { fileName, content, filePath })
+      return
+    }
+
+    const content = fs.readFileSync(filePath, 'utf-8')
+    mainWindow.webContents.send('open-external-file', {
+      fileName,
+      content,
+      fileType,
+      filePath: undefined,
+      isPdf: false,
+    })
+  } catch (error) {
+    console.error('[MAIN] Dosya okunurken hata:', error)
+  }
+}
+
+function extractFileArg(argv: string[] = []) {
+  for (let i = argv.length - 1; i >= 0; i -= 1) {
+    const arg = argv[i]
+    if (typeof arg !== 'string') continue
+    const lower = arg.toLowerCase()
+    const isSupported = lower.endsWith('.lum') || lower.endsWith('.pdf')
+    if (isSupported && fs.existsSync(arg)) {
+      return arg
+    }
+  }
+  return null
+}
+
 function createWindow() {
   const iconPath = process.platform === 'win32' 
     ? path.join(process.env.VITE_PUBLIC || '', 'icon.ico')
@@ -43,8 +107,15 @@ function createWindow() {
 
   // Maximize and show when ready
   mainWindow.once('ready-to-show', () => {
-    mainWindow?.maximize()
-    mainWindow?.show()
+    if (mainWindow) {
+      mainWindow.maximize()
+      mainWindow.show()
+      const filePath = extractFileArg(process.argv as unknown as string[])
+      if (filePath) {
+        console.log('[MAIN] Opening file from startup:', filePath)
+        setTimeout(() => handleFileOpen(filePath), 1000)
+      }
+    }
   })
 
   // Dereference the window object when closed
@@ -81,16 +152,71 @@ app.on('activate', () => {
 })
 
 // Create window when app is ready
+// Single instance lock ve hazır olduğunda pencere oluşturma
+const gotTheLock = app.requestSingleInstanceLock()
+
+if (!gotTheLock) {
+  console.log('[MAIN] Another instance is already running. Exiting.')
+  app.quit()
+  process.exit(0)
+}
+
+app.on('second-instance', (_event, commandLine) => {
+  console.log('[MAIN] Second instance detected. Focusing primary window.')
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+  }
+  const filePath = extractFileArg(commandLine as unknown as string[])
+  if (filePath) {
+    console.log('[MAIN] Opening file from second instance:', filePath)
+    handleFileOpen(filePath)
+  }
+})
+
+// macOS open-file desteği
+app.on('open-file', (event, filePath) => {
+  event.preventDefault()
+  console.log('[MAIN] macOS open-file event:', filePath)
+  if (mainWindow) {
+    handleFileOpen(filePath)
+  } else {
+    app.once('ready', () => {
+      setTimeout(() => handleFileOpen(filePath), 1000)
+    })
+  }
+})
+
 app.whenReady().then(() => {
   createWindow()
-  
-  // Register FORCE QUIT shortcut: Ctrl+Shift+Q (for debugging)
   globalShortcut.register('CommandOrControl+Shift+Q', () => {
     console.log('[MAIN] FORCE QUIT shortcut pressed - calling app.exit(0)')
-    app.exit(0) // Force immediate exit, bypassing all events
+    app.exit(0)
   })
-  
   console.log('[MAIN] App ready. Force quit shortcut: Ctrl+Shift+Q')
+
+  // Configure auto-updater
+  try {
+    autoUpdater.autoDownload = true
+    autoUpdater.on('update-available', (info) => {
+      if (mainWindow) mainWindow.webContents.send('update-available', info)
+    })
+    autoUpdater.on('update-downloaded', (info) => {
+      if (mainWindow) mainWindow.webContents.send('update-downloaded', info)
+    })
+    autoUpdater.on('download-progress', (progress) => {
+      if (mainWindow) mainWindow.webContents.send('download-progress', progress)
+    })
+    autoUpdater.on('error', (err) => {
+      if (mainWindow) mainWindow.webContents.send('update-error', String(err))
+    })
+    // Start update check
+    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+      console.warn('[MAIN] autoUpdater check error:', err)
+    })
+  } catch (e) {
+    console.warn('[MAIN] autoUpdater init failed:', e)
+  }
 })
 
 // Unregister shortcuts on quit
@@ -167,4 +293,20 @@ ipcMain.handle('storage:clearAll', async () => {
 
 ipcMain.handle('storage:getUserDataPath', async () => {
   return USER_DATA_PATH
+})
+
+// ============================================================================
+// MISC IPC HANDLERS (App Info, Updater)
+// ============================================================================
+
+ipcMain.handle('get-app-version', async () => app.getVersion())
+ipcMain.handle('get-app-path', async () => app.getAppPath())
+ipcMain.handle('install-update', async () => {
+  try {
+    autoUpdater.quitAndInstall()
+    return true
+  } catch (e) {
+    console.error('[MAIN] install-update error:', e)
+    return false
+  }
 })

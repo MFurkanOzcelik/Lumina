@@ -12,6 +12,7 @@ import { useNotesStore } from './store/useNotesStore';
 import { applyTheme } from './utils/themes';
 import { migrateFromLocalStorage, migrateToFileStorage } from './utils/storage';
 import { useTranslation } from './utils/translations';
+import { useNotesStore as useNotesStoreSingleton } from './store/useNotesStore';
 
 // File open handler types (storage types are in electron.d.ts)
 
@@ -208,6 +209,26 @@ function App() {
 
     initialize();
   }, [hydrateSettings, hydrateNotes]);
+
+  // Opsiyonel: Geçersiz attachment verilerini tek seferlik temizle (manuel tetiklemeli)
+  useEffect(() => {
+    if (localStorage.getItem('RESET_INVALID_ATTACHMENTS') === 'true') {
+      const store = useNotesStoreSingleton.getState();
+      notes.forEach((n) => {
+        const fileLike: any = (n as any)?.attachment?.blob;
+        const isValid =
+          fileLike == null ||
+          (typeof Blob !== 'undefined' && (fileLike instanceof Blob || fileLike instanceof File)) ||
+          typeof fileLike === 'string' ||
+          (fileLike && typeof fileLike === 'object' && 'path' in fileLike && typeof fileLike.path === 'string');
+        if (!isValid) {
+          console.warn('[App] Geçersiz attachment tespit edildi, kaldırılıyor:', n.id);
+          store.updateNote(n.id, { attachment: undefined });
+        }
+      });
+      localStorage.removeItem('RESET_INVALID_ATTACHMENTS');
+    }
+  }, [notes]);
 
   // Validate and restore activeNoteId AFTER notes are loaded
   useEffect(() => {

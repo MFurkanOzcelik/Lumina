@@ -47,8 +47,9 @@ export const KanbanBoard = () => {
   const [editingColumnTitle, setEditingColumnTitle] = useState('');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskValue, setEditingTaskValue] = useState('');
-  const [dragOverCardId, setDragOverCardId] = useState<string | null>(null);
+  // Kart bazında vurguyu kaldırdığımız için state'e gerek yok
   const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
+  const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null); // Sürüklenen kart hangi sütunda
 
   // Auto-scroll için ref'ler
   const boardRef = useRef<HTMLDivElement>(null);
@@ -270,15 +271,12 @@ export const KanbanBoard = () => {
     setScrollDirection(null);
   };
 
-  const onCardDragEnter = (e: React.DragEvent<HTMLDivElement>, taskId: string) => {
-    e.preventDefault();
-    setDragOverCardId(taskId);
+  const onCardDragEnter = (_e: React.DragEvent<HTMLDivElement>, _taskId: string) => {
+    // Kart vurgusu yok - sadece sürükleme akışı için gerekli preventDefault üst seviye eventlerde var
   };
 
-  const onCardDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLDivElement).classList.contains('kanban-card')) {
-      setDragOverCardId(null);
-    }
+  const onCardDragLeave = (_e: React.DragEvent<HTMLDivElement>) => {
+    // Kart vurgusu yok
   };
 
   const onCardDrop = (
@@ -293,8 +291,8 @@ export const KanbanBoard = () => {
     const { columnId: sourceColumnId, taskId } = payload;
     moveCard(sourceColumnId, targetColumnId, taskId, targetTaskId);
 
-    setDragOverCardId(null);
     setDraggedCardId(null);
+    setDragOverColumnId(null);
     setScrollDirection(null); // Drag bittikten sonra kaydırmayı durdur
   };
 
@@ -316,9 +314,22 @@ export const KanbanBoard = () => {
         {columns.map((column) => (
           <div
             key={column.id}
-            className="kanban-column"
+            className={`kanban-column ${dragOverColumnId === column.id ? 'drag-over-column' : ''}`}
             onDragOver={onDragOver}
-            onDrop={(e) => onCardDrop(e, column.id)}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              setDragOverColumnId(column.id); // Hedef sütunu vurgula
+            }}
+            onDragLeave={(e) => {
+              // Yalnızca sütun dışına çıkınca vurguyu kaldır
+              if (e.currentTarget === e.target) {
+                setDragOverColumnId(null);
+              }
+            }}
+            onDrop={(e) => {
+              onCardDrop(e, column.id);
+              setDragOverColumnId(null);
+            }}
           >
             {/* Sütun Başlığı */}
             <div className="kanban-column-header">
@@ -395,17 +406,12 @@ export const KanbanBoard = () => {
                   onDrop={(e) => onCardDrop(e as any, column.id, task.id)}
                   className="kanban-card"
                   style={{
-                    backgroundColor:
-                      draggedCardId === task.id ? 'var(--color-accent)' : 'var(--card-bg)',
-                    border:
-                      dragOverCardId === task.id
-                        ? `2px solid var(--color-accent)`
-                        : `1px solid var(--border-color)`,
-                    color: draggedCardId === task.id ? 'white' : 'var(--text-primary)',
-                    boxShadow:
-                      dragOverCardId === task.id || draggedCardId === task.id
-                        ? '0 0 12px var(--color-accent)'
-                        : '0 1px 3px rgba(0,0,0,0.1)',
+                    backgroundColor: 'var(--card-bg)',
+                    border: `1px solid var(--border-color)`,
+                    color: 'var(--text-primary)',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                    opacity: draggedCardId === task.id ? 0.6 : 1, // Sürüklemede hafif transparan
+                    transform: draggedCardId === task.id ? 'scale(0.995)' : 'none',
                   }}
                 >
                   {/* Sürükleme İkonu */}
