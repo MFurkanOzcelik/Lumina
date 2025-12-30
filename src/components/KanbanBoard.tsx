@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { Edit2, Trash2, GripVertical, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useTranslation } from '../utils/translations';
+import { useSettingsStore } from '../store/useSettingsStore';
 
 interface Card {
   id: string;
@@ -15,12 +17,6 @@ interface Column {
 
 const STORAGE_KEY = 'kanban-columns-v2';
 
-const DEFAULT_COLUMNS: Column[] = [
-  { id: 'todo', title: 'Yapılacaklar', tasks: [] },
-  { id: 'inProgress', title: 'Sürüyor', tasks: [] },
-  { id: 'done', title: 'Bitti', tasks: [] },
-];
-
 const createId = () => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -29,6 +25,15 @@ const createId = () => {
 };
 
 export const KanbanBoard = () => {
+  const language = useSettingsStore((state) => state.language);
+  const t = useTranslation(language);
+  
+  const DEFAULT_COLUMNS: Column[] = [
+    { id: 'todo', title: t('todoColumn'), tasks: [] },
+    { id: 'inProgress', title: t('inProgressColumn'), tasks: [] },
+    { id: 'done', title: t('doneColumn'), tasks: [] },
+  ];
+  
   const [columns, setColumns] = useState<Column[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -98,14 +103,14 @@ export const KanbanBoard = () => {
   const handleAddColumn = () => {
     const newColumn: Column = {
       id: `col-${createId()}`,
-      title: 'Yeni Sütun',
+      title: t('newColumnDefaultTitle'),
       tasks: [],
     };
     setColumns((prev) => [...prev, newColumn]);
   };
 
   const handleDeleteColumn = (columnId: string) => {
-    if (window.confirm('Bu sütunu silmek istiyor musunuz? Tüm görevler kaybedilecektir.')) {
+    if (window.confirm(t('deleteColumnConfirm'))) {
       setColumns((prev) => prev.filter((col) => col.id !== columnId));
     }
   };
@@ -356,7 +361,7 @@ export const KanbanBoard = () => {
                     type="button"
                     onClick={() => handleColumnEditStart(column.id, column.title)}
                     className="kanban-icon-btn"
-                    title="Sütun başlığını düzenle"
+                    title={t('editColumnTitle')}
                   >
                     <Edit2 size={14} />
                   </button>
@@ -364,7 +369,7 @@ export const KanbanBoard = () => {
                     type="button"
                     onClick={() => handleDeleteColumn(column.id)}
                     className="kanban-icon-btn kanban-delete-btn"
-                    title="Sütunu sil"
+                    title={t('deleteColumnTitle')}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -382,14 +387,14 @@ export const KanbanBoard = () => {
                   onChange={(e) => setNewTask(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleAddTask(column.id)}
                   className="kanban-task-input"
-                  placeholder="Yeni görev..."
+                  placeholder={t('newTaskPlaceholder')}
                 />
                 <button
                   type="button"
                   onClick={() => handleAddTask(column.id)}
                   className="kanban-add-btn"
                 >
-                  Ekle
+                  {t('addTaskBtn')}
                 </button>
               </div>
             )}
@@ -453,7 +458,7 @@ export const KanbanBoard = () => {
                         type="button"
                         onClick={() => handleTaskEditStart(task.id, task.text)}
                         className="kanban-icon-btn"
-                        title="Görevi düzenle"
+                        title={t('editTaskTitle')}
                       >
                         <Edit2 size={14} />
                       </button>
@@ -462,7 +467,7 @@ export const KanbanBoard = () => {
                       type="button"
                       onClick={() => handleDeleteTask(column.id, task.id)}
                       className="kanban-icon-btn kanban-delete-btn"
-                      title="Görevi sil"
+                      title={t('deleteTaskTitle')}
                     >
                       <Trash2 size={14} />
                     </button>
@@ -482,10 +487,10 @@ export const KanbanBoard = () => {
             type="button"
             onClick={handleAddColumn}
             className="kanban-add-column-btn"
-            title="Yeni sütun ekle"
+            title={t('addColumnBtn')}
           >
             <Plus size={32} />
-            <span>Sütun Ekle</span>
+            <span>{t('addColumnBtn')}</span>
           </button>
         </motion.div>
       </div>

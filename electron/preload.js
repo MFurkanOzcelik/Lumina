@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAppPath: () => ipcRenderer.invoke('get-app-path'),
   platform: process.platform,
   isElectron: true,
+  getPathForFile: (file) => webUtils.getPathForFile(file),
   
   // Listen for file open events (legacy .lum files)
   onOpenLumFile: (callback) => {

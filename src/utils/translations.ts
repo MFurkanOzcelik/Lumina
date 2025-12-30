@@ -86,6 +86,78 @@ export const translations = {
     passwordStrengthMedium: 'Medium',
     passwordStrengthStrong: 'Strong',
     passwordRequirements: 'At least 8 characters, mix of uppercase, lowercase, numbers, and symbols',
+    
+    // Context Menu
+    contextOpenSide: 'Open to Side',
+    renameBtn: 'Rename',
+    moveBtn: 'Move',
+    exportBtn: 'Export',
+    deleteBtn: 'Delete',
+    pinFolder: 'Pin Folder',
+    unpinFolder: 'Unpin Folder',
+    
+    // Kanban Board
+    kanbanTitle: 'Board',
+    addColumnBtn: 'Add Column',
+    newColumnDefaultTitle: 'New Column',
+    deleteColumnConfirm: 'Are you sure you want to delete this column? All tasks will be lost.',
+    newTaskPlaceholder: 'New task...',
+    addTaskBtn: 'Add',
+    editColumnTitle: 'Edit column title',
+    deleteColumnTitle: 'Delete column',
+    editTaskTitle: 'Edit task',
+    deleteTaskTitle: 'Delete task',
+    deleteTaskConfirm: 'Are you sure you want to delete this task?',
+    todoColumn: 'To Do',
+    inProgressColumn: 'In Progress',
+    doneColumn: 'Done',
+    
+    // Voice & Recording
+    startDictation: 'Start Dictation',
+    stopDictation: 'Stop Dictation',
+    dictationStarted: 'Dictation started - start speaking',
+    dictationStopped: 'Dictation stopped',
+    dictationNotSupported: 'Your browser does not support speech recognition',
+    startRecording: 'Start Recording',
+    stopRecording: 'Stop Recording',
+    recordingStarted: 'Recording started',
+    recordingStopped: 'Recording stopped',
+    recordingError: 'Recording error',
+    audioRecording: 'Audio Recording',
+    renameAudio: 'Rename',
+    deleteAudio: 'Delete',
+    deleteAudioConfirm: 'Are you sure you want to delete this audio recording?',
+    newAudioName: 'New name:',
+    
+    // Split Screen
+    mainPane: 'Main View',
+    closeMainPane: 'Close main pane',
+    closeSecondaryPane: 'Close secondary pane',
+    
+    // File Handling
+    fileNotFound: 'File not found',
+    fileTooLarge: 'File is too large! Maximum size is 50MB.',
+    fileUploadSuccess: 'uploaded successfully!',
+    fileUploadError: 'Error uploading file.',
+    
+    // General
+    dropHere: 'Drop here',
+    noNotesYet: 'No notes yet',
+    noFolderlessNotes: 'No folderless notes yet',
+    
+    // Modals
+    selectFolder: 'Select Folder',
+    noFolders: 'No folders yet',
+    noteWillBeDeleted: 'This note will be permanently deleted.',
+    folderWillBeDeleted: 'The folder will be deleted and all notes will be moved to folderless.',
+    exportNote: 'Export Note',
+    chooseExportFormat: 'Choose the format you want to export',
+    asFormat: 'as:',
+    removeFile: 'Remove File',
+    codeBlock: 'Code Block',
+    focusEditorToUseCodeBlock: 'Focus editor to use Code Block',
+    audioRecordingAdded: 'Audio recording added',
+    fileNotFoundOrInvalid: 'File not found or invalid file format.',
   },
   tr: {
     welcome: 'Hoşgeldiniz',
@@ -172,6 +244,78 @@ export const translations = {
     passwordStrengthMedium: 'Orta',
     passwordStrengthStrong: 'Güçlü',
     passwordRequirements: 'En az 8 karakter, büyük harf, küçük harf, rakam ve sembol karışımı',
+    
+    // Sağ Tık Menüsü
+    contextOpenSide: 'Yan Tarafta Aç',
+    renameBtn: 'Yeniden Adlandır',
+    moveBtn: 'Taşı',
+    exportBtn: 'Dışa Aktar',
+    deleteBtn: 'Sil',
+    pinFolder: 'Klasörü Sabitle',
+    unpinFolder: 'Sabitlemeyi Kaldır',
+    
+    // Kanban Panosu
+    kanbanTitle: 'Pano',
+    addColumnBtn: 'Sütun Ekle',
+    newColumnDefaultTitle: 'Yeni Sütun',
+    deleteColumnConfirm: 'Bu sütunu silmek istediğinize emin misiniz? Tüm görevler kaybedilecektir.',
+    newTaskPlaceholder: 'Yeni görev...',
+    addTaskBtn: 'Ekle',
+    editColumnTitle: 'Sütun başlığını düzenle',
+    deleteColumnTitle: 'Sütunu sil',
+    editTaskTitle: 'Görevi düzenle',
+    deleteTaskTitle: 'Görevi sil',
+    deleteTaskConfirm: 'Bu görevi silmek istediğinize emin misiniz?',
+    todoColumn: 'Yapılacaklar',
+    inProgressColumn: 'Sürüyor',
+    doneColumn: 'Bitti',
+    
+    // Ses ve Kayıt
+    startDictation: 'Dikte Başlat',
+    stopDictation: 'Dikteyi Durdur',
+    dictationStarted: 'Dikte başladı - konuşmaya başlayın',
+    dictationStopped: 'Dikte durduruldu',
+    dictationNotSupported: 'Tarayıcınız ses tanımayı desteklemiyor',
+    startRecording: 'Ses Kaydet',
+    stopRecording: 'Kaydı Durdur',
+    recordingStarted: 'Kayıt başladı',
+    recordingStopped: 'Kayıt durduruldu',
+    recordingError: 'Kayıt hatası',
+    audioRecording: 'Ses Kaydı',
+    renameAudio: 'Yeniden Adlandır',
+    deleteAudio: 'Sil',
+    deleteAudioConfirm: 'Ses kaydını silmek istediğinizden emin misiniz?',
+    newAudioName: 'Yeni isim:',
+    
+    // Bölünmüş Ekran
+    mainPane: 'Ana Görünüm',
+    closeMainPane: 'Ana paneli kapat',
+    closeSecondaryPane: 'Yan paneli kapat',
+    
+    // Dosya İşlemleri
+    fileNotFound: 'Dosya bulunamadı',
+    fileTooLarge: 'Dosya çok büyük! Maksimum boyut 50MB.',
+    fileUploadSuccess: 'başarıyla yüklendi!',
+    fileUploadError: 'Dosya yüklenirken hata oluştu.',
+    
+    // Genel
+    dropHere: 'Buraya bırak',
+    noNotesYet: 'Henüz not yok',
+    noFolderlessNotes: 'Henüz klasörsüz not yok',
+    
+    // Modal'lar
+    selectFolder: 'Klasör Seç',
+    noFolders: 'Henüz klasör yok',
+    noteWillBeDeleted: 'Not kalıcı olarak silinecektir.',
+    folderWillBeDeleted: 'Klasör silinecek ve tüm notlar klasörsüz notlara taşınacaktır.',
+    exportNote: 'Notu Dışa Aktar',
+    chooseExportFormat: 'Dışa aktarmak istediğiniz formatı seçin',
+    asFormat: 'olarak:',
+    removeFile: 'Dosyayı Kaldır',
+    codeBlock: 'Kod Bloğu',
+    focusEditorToUseCodeBlock: 'Kod bloğu kullanmak için editöre odaklanın',
+    audioRecordingAdded: 'Ses kaydı eklendi',
+    fileNotFoundOrInvalid: 'Dosya bulunamadı veya geçersiz dosya biçimi.',
   },
 };
 

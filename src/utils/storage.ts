@@ -116,19 +116,46 @@ const fileStorage = {
 // Main storage API - uses file storage in Electron, IndexedDB as fallback
 export const notesStorage = {
   async getNotes(): Promise<any[]> {
+    let notes: any[] = [];
     if (isElectron) {
-      return await fileStorage.getNotes();
+      notes = await fileStorage.getNotes();
     } else {
-      const notes = await idbStorage.get<any[]>(NOTES_KEY);
-      return notes || [];
+      const idbNotes = await idbStorage.get<any[]>(NOTES_KEY);
+      notes = idbNotes || [];
     }
+
+    // Return notes as-is without PDF special handling
+    return notes;
   },
 
   async saveNotes(notes: any[]): Promise<void> {
+    // Serileştirme güvenliği: Blob/File içeren attachment'ları temizle
+    const sanitizedNotes = (notes || []).map((n: any) => {
+      if (!n?.attachment) return n;
+      const a = n.attachment;
+      const blobLike: any = a.blob;
+
+      // Blob/File serileştirilemez; metadata kalsın, blob'ı çıkar
+      if (typeof Blob !== 'undefined' && (blobLike instanceof Blob || blobLike instanceof File)) {
+        return {
+          ...n,
+          attachment: {
+            name: a.name,
+            type: a.type,
+            size: a.size ?? 0,
+            blob: undefined,
+          },
+        };
+      }
+
+      // Zaten string URL veya { path } ise dokunma
+      return n;
+    });
+
     if (isElectron) {
-      await fileStorage.saveNotes(notes);
+      await fileStorage.saveNotes(sanitizedNotes);
     } else {
-      await idbStorage.set(NOTES_KEY, notes);
+      await idbStorage.set(NOTES_KEY, sanitizedNotes);
     }
   },
 

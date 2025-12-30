@@ -15,7 +15,8 @@ export interface Note {
     name: string;
     type: string;
     size: number;
-    blob: Blob;
+    // Blob (web), string URL veya Electron’da { path } nesnesi
+    blob: Blob | string | { path: string } | undefined;
   };
   // Tags for categorization
   tags?: string[];

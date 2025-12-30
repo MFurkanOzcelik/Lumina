@@ -29,6 +29,8 @@ interface SidebarProps {
 }
 
 const DraggableNote = ({ noteId, title, isActive, isEncrypted, onClick, onDelete, onRename, onMove, onExport, onOpenInSplitView }: any) => {
+  const language = useSettingsStore((state) => state.language);
+  const t = useTranslation(language);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -48,7 +50,7 @@ const DraggableNote = ({ noteId, title, isActive, isEncrypted, onClick, onDelete
     : undefined;
 
   // Display "Untitled Note" if title is empty
-  const displayTitle = title.trim() === '' ? 'Untitled Note' : title;
+  const displayTitle = title.trim() === '' ? t('untitledNote') : title;
 
   useEffect(() => {
     if (isRenaming && renameInputRef.current) {
@@ -201,11 +203,11 @@ const DraggableNote = ({ noteId, title, isActive, isEncrypted, onClick, onDelete
       <Modal
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
-        title="Emin misiniz?"
+        title={t('confirmDelete')}
       >
         <div className="space-y-4">
           <p style={{ color: 'var(--color-textSecondary)' }}>
-            Not kalıcı olarak silinecektir.
+            {t('noteWillBeDeleted')}
           </p>
           <div className="flex gap-3">
             <motion.button
@@ -224,7 +226,7 @@ const DraggableNote = ({ noteId, title, isActive, isEncrypted, onClick, onDelete
                 color: 'var(--color-text)',
               }}
             >
-              İptal
+              {t('cancel')}
             </motion.button>
             <motion.button
               ref={deleteButtonRef}
@@ -247,7 +249,7 @@ const DraggableNote = ({ noteId, title, isActive, isEncrypted, onClick, onDelete
                 color: 'white',
               }}
             >
-              Sil
+              {t('delete')}
             </motion.button>
           </div>
         </div>
@@ -257,6 +259,8 @@ const DraggableNote = ({ noteId, title, isActive, isEncrypted, onClick, onDelete
 };
 
 const DroppableFolder = ({ folderId, name, notes, activeNoteId, isPinned, onNoteClick, onNoteDelete, onFolderDelete, onFolderRename, onNoteRename, onNoteMove, onNoteExport, onTogglePin, initialOpen = true, onToggle, onOpenInSplitView }: any) => {
+  const language = useSettingsStore((state) => state.language);
+  const t = useTranslation(language);
   const [isOpen, setIsOpen] = useState<boolean>(initialOpen ?? true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -428,11 +432,11 @@ const DroppableFolder = ({ folderId, name, notes, activeNoteId, isPinned, onNote
       <Modal
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
-        title="Emin misiniz?"
+        title={t('confirmDelete')}
       >
         <div className="space-y-4">
           <p style={{ color: 'var(--color-textSecondary)' }}>
-            Klasör silinecek ve tüm notlar klasörsüz notlara taşınacaktır.
+            {t('folderWillBeDeleted')}
           </p>
           <div className="flex gap-3">
             <motion.button
@@ -446,7 +450,7 @@ const DroppableFolder = ({ folderId, name, notes, activeNoteId, isPinned, onNote
                 color: 'var(--color-text)',
               }}
             >
-              İptal
+              {t('cancel')}
             </motion.button>
             <motion.button
               type="button"
@@ -462,7 +466,7 @@ const DroppableFolder = ({ folderId, name, notes, activeNoteId, isPinned, onNote
                 color: 'white',
               }}
             >
-              Sil
+              {t('delete')}
             </motion.button>
           </div>
         </div>
@@ -551,14 +555,14 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick, expandedF
     const markdown = turndownService.turndown(note.content);
     
     // Create markdown content with title
-    const fullMarkdown = `# ${note.title || 'Untitled Note'}\n\n${markdown}`;
+    const fullMarkdown = `# ${note.title || t('untitledNote')}\n\n${markdown}`;
     
     // Create blob and download with .lum extension
     const blob = new Blob([fullMarkdown], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${note.title || 'Untitled Note'}.lum`;
+    link.download = `${note.title || t('untitledNote')}.lum`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -580,7 +584,7 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick, expandedF
 
     const opt = {
       margin: 10,
-      filename: `${note.title || 'Untitled Note'}.pdf`,
+      filename: `${note.title || t('untitledNote')}.pdf`,
       image: { type: 'jpeg' as const, quality: 0.98 },
       html2canvas: { scale: 2 },
       jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
@@ -728,7 +732,7 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick, expandedF
               border: `1px solid ${viewMode === 'editor' ? 'var(--color-accent)' : 'var(--color-border)'}`,
             }}
           >
-            📝 Notlar
+            📝 {t('home')}
           </motion.button>
           <motion.button
             type="button"
@@ -742,7 +746,7 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick, expandedF
               border: `1px solid ${viewMode === 'kanban' ? 'var(--color-accent)' : 'var(--color-border)'}`,
             }}
           >
-            📋 Pano
+            📋 {t('kanbanTitle')}
           </motion.button>
         </div>
 
@@ -1166,7 +1170,7 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick, expandedF
           onClose={() => setExportNoteId(null)}
           onExportLum={() => handleExportAsLum(exportNoteId)}
           onExportPdf={() => handleExportAsPdf(exportNoteId)}
-          noteTitle={notes.find((n) => n.id === exportNoteId)?.title || 'Untitled Note'}
+          noteTitle={notes.find((n) => n.id === exportNoteId)?.title || t('untitledNote')}
         />
       )}
     </DndContext>
@@ -1174,6 +1178,8 @@ export const Sidebar = ({ width, onResize, collapsed, onSettingsClick, expandedF
 };
 
 const DroppableFolderlessArea = ({ notes, activeNoteId, onNoteClick, onNoteDelete, onNoteRename, onNoteMove, onNoteExport, onOpenInSplitView }: any) => {
+  const language = useSettingsStore((state) => state.language);
+  const t = useTranslation(language);
   const { setNodeRef, isOver } = useDroppable({
     id: 'folderless',
   });
@@ -1227,7 +1233,7 @@ const DroppableFolderlessArea = ({ notes, activeNoteId, onNoteClick, onNoteDelet
               backgroundColor: isOver ? 'var(--color-bgTertiary)' : 'transparent',
             }}
           >
-            {isOver ? 'Buraya bırak' : 'Henüz klasörsüz not yok'}
+            {isOver ? t('dropHere') : t('noFolderlessNotes')}
           </div>
         )}
       </motion.div>

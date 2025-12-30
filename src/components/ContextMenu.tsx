@@ -1,6 +1,8 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Edit2, Trash2, FolderInput, FileDown, Pin, PinOff, Copy } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { useTranslation } from '../utils/translations';
+import { useSettingsStore } from '../store/useSettingsStore';
 
 interface ContextMenuProps {
   isOpen: boolean;
@@ -30,6 +32,8 @@ export const ContextMenu = ({
   type,
 }: ContextMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
+  const language = useSettingsStore((state) => state.language);
+  const t = useTranslation(language);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -76,7 +80,7 @@ export const ContextMenu = ({
             style={{ color: 'var(--color-text)' }}
           >
             <Edit2 size={16} />
-            <span className="text-sm font-medium">Yeniden Adlandır</span>
+            <span className="text-sm font-medium">{t('renameBtn')}</span>
           </motion.button>
 
           {/* Move Option - Only for notes */}
@@ -92,7 +96,7 @@ export const ContextMenu = ({
               style={{ color: 'var(--color-text)' }}
             >
               <FolderInput size={16} />
-              <span className="text-sm font-medium">Taşı</span>
+              <span className="text-sm font-medium">{t('moveBtn')}</span>
             </motion.button>
           )}
 
@@ -109,7 +113,7 @@ export const ContextMenu = ({
               style={{ color: 'var(--color-text)' }}
             >
               <FileDown size={16} />
-              <span className="text-sm font-medium">Export</span>
+              <span className="text-sm font-medium">{t('exportBtn')}</span>
             </motion.button>
           )}
 
@@ -126,7 +130,7 @@ export const ContextMenu = ({
               style={{ color: 'var(--color-accent)' }}
             >
               <Copy size={16} />
-              <span className="text-sm font-medium">Yan Tarafta Aç</span>
+              <span className="text-sm font-medium">{t('contextOpenSide')}</span>
             </motion.button>
           )}
 
@@ -144,7 +148,7 @@ export const ContextMenu = ({
             >
               {isPinned ? <PinOff size={16} /> : <Pin size={16} />}
               <span className="text-sm font-medium">
-                {isPinned ? 'Sabitlemeyi Kaldır' : 'Sabitle'}
+                {isPinned ? t('unpinFolder') : t('pinFolder')}
               </span>
             </motion.button>
           )}
@@ -167,7 +171,7 @@ export const ContextMenu = ({
             style={{ color: 'var(--color-danger)' }}
           >
             <Trash2 size={16} />
-            <span className="text-sm font-medium">Sil</span>
+            <span className="text-sm font-medium">{t('deleteBtn')}</span>
           </motion.button>
         </div>
       </motion.div>

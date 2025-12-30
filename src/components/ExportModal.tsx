@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
 import { FileDown, FileText, X } from 'lucide-react';
 import { Modal } from './Modal';
+import { useTranslation } from '../utils/translations';
+import { useSettingsStore } from '../store/useSettingsStore';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -17,11 +19,14 @@ export const ExportModal = ({
   onExportPdf,
   noteTitle,
 }: ExportModalProps) => {
+  const language = useSettingsStore((state) => state.language);
+  const t = useTranslation(language);
+  
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Export Note">
+    <Modal isOpen={isOpen} onClose={onClose} title={t('exportNote')}>
       <div className="space-y-4">
         <p style={{ color: 'var(--color-textSecondary)', fontSize: '0.875rem' }}>
-          Choose the format you want to export "{noteTitle || 'Untitled Note'}" as:
+          {t('chooseExportFormat')} "{noteTitle || t('untitledNote')}" {t('asFormat')}
         </p>
 
         <div className="grid grid-cols-1 gap-3">

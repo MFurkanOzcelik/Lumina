@@ -96,13 +96,20 @@ export const useNotesStore = create<NotesState>()((set, get) => ({
       },
 
       updateNote: (id, updates) => {
+        console.log('🔴 [Store] updateNote called:', { id, updates });
         set((state) => {
           const updatedNotes = state.notes.map((note) =>
             note.id === id
               ? { ...note, ...updates, updatedAt: Date.now() }
               : note
           );
-          debouncedSaveNotes(updatedNotes, () => set({ hasUnsavedChanges: false }));
+          const updatedNote = updatedNotes.find(n => n.id === id);
+          console.log('🔴 [Store] Updated note:', updatedNote);
+          console.log('🔴 [Store] CALLING debouncedSaveNotes with', updatedNotes.length, 'notes');
+          debouncedSaveNotes(updatedNotes, () => {
+            console.log('🔴 [Store] Save callback executed');
+            set({ hasUnsavedChanges: false });
+          });
           return { notes: updatedNotes, hasUnsavedChanges: true };
         });
       },

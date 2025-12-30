@@ -13,9 +13,6 @@ import {
   Save,
   Trash2,
   ChevronDown,
-  Paperclip,
-  Download,
-  X,
   Code,
   FileDown,
   Lock,
@@ -33,6 +30,7 @@ import { ExportModal } from './ExportModal';
 import { EncryptedNoteOverlay } from './EncryptedNoteOverlay';
 import { PasswordPromptModal } from './PasswordPromptModal';
 import { ToolbarButton } from './ToolbarButton';
+import { PDFViewer } from './PDFViewer';
 import TurndownService from 'turndown';
 import hljs from 'highlight.js/lib/core';
 import javascript from 'highlight.js/lib/languages/javascript';
@@ -84,7 +82,6 @@ export const Editor = ({ noteIdOverride }: { noteIdOverride?: string | null } = 
     const saved = localStorage.getItem('editor-font-size');
     return saved ? parseInt(saved, 10) : 16;
   });
-  const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [isEditorFocused, setIsEditorFocused] = useState(false); // Track if editor has focus
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [activeFormats, setActiveFormats] = useState({
@@ -107,41 +104,14 @@ export const Editor = ({ noteIdOverride }: { noteIdOverride?: string | null } = 
   // Encryption state
   const isNoteEncrypted = activeNote?.isEncrypted || false;
   const isNoteUnlocked = activeNote ? getDecryptedContent(activeNote.id) !== null : false;
-
-  // Ekli dosya için URL oluşturma ve temizleme (güvenli)
-  useEffect(() => {
-    let url: string | null = null;
-
-    const fileLike: any = activeNote?.attachment?.blob as any;
-
-    const toFileUrl = (p: string) => (p?.startsWith('file://') ? p : `file:///${p.replace(/\\/g, '/')}`);
-
-    try {
-      if (fileLike) {
-        if (typeof Blob !== 'undefined' && (fileLike instanceof Blob || fileLike instanceof File)) {
-          url = URL.createObjectURL(fileLike);
-        } else if (typeof fileLike === 'string') {
-          url = fileLike;
-        } else if (fileLike && typeof fileLike === 'object' && 'path' in fileLike && typeof fileLike.path === 'string') {
-          url = toFileUrl(fileLike.path);
-        } else {
-          console.warn('[Editor] Geçersiz attachment.blob türü – atlanıyor:', fileLike);
-        }
-      }
-    } catch (err) {
-      console.error('[Editor] createObjectURL hatası:', err);
-      url = null;
-    }
-
-    setFileUrl(url);
-
-    return () => {
-      if (url && url.startsWith('blob:')) {
-        try { URL.revokeObjectURL(url); } catch {}
-      }
-      setFileUrl(null);
-    };
-  }, [activeNote?.attachment]);
+  const currentFile = activeNote?.attachment;
+  const currentFilePath =
+    typeof currentFile?.blob === 'object' && currentFile?.blob && 'path' in currentFile.blob
+      ? currentFile.blob.path
+      : undefined;
+  const isPdfFile =
+    (currentFile?.type && currentFile.type.toLowerCase() === 'pdf') ||
+    (activeNote?.title?.toLowerCase().endsWith('.pdf') ?? false);
 
   // Toolbar durumunu gerçek imleç durumuna göre eşitle
   const syncToolbarState = useCallback(() => {
@@ -1366,969 +1336,724 @@ export const Editor = ({ noteIdOverride }: { noteIdOverride?: string | null } = 
         className="h-screen flex flex-col"
         style={{ backgroundColor: 'var(--color-bg)' }}
       >
-        {/* Toolbar - Fixed height */}
-        <div
-          className={`flex-none flex items-center justify-between py-4 border-b ${
-            sidebarCollapsed ? 'pl-24 pr-6' : 'px-6'
-          }`}
-          style={{ borderColor: 'var(--color-border)' }}
-        >
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Bold */}
-            <ToolbarButton
-              icon={Bold}
-              label={t('bold')}
-              isActive={checkFormatActive('bold')}
-              onClick={() => handleFormatClick('bold')}
-            />
+        {isPdfFile && currentFilePath ? (
+          <div className="flex-1 overflow-hidden">
+            <PDFViewer file={{ path: currentFilePath }} />
+          </div>
+        ) : (
+          <>
+            {/* Toolbar - Fixed height */}
+            <div
+              className={`flex-none flex items-center justify-between py-4 border-b ${
+                sidebarCollapsed ? 'pl-24 pr-6' : 'px-6'
+              }`}
+              style={{ borderColor: 'var(--color-border)' }}
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Bold */}
+                <ToolbarButton
+                  icon={Bold}
+                  label={t('bold')}
+                  isActive={checkFormatActive('bold')}
+                  onClick={() => handleFormatClick('bold')}
+                />
 
-            {/* Italic */}
-            <ToolbarButton
-              icon={Italic}
-              label={t('italic')}
-              isActive={checkFormatActive('italic')}
-              onClick={() => handleFormatClick('italic')}
-            />
+                {/* Italic */}
+                <ToolbarButton
+                  icon={Italic}
+                  label={t('italic')}
+                  isActive={checkFormatActive('italic')}
+                  onClick={() => handleFormatClick('italic')}
+                />
 
-            {/* Underline */}
-            <ToolbarButton
-              icon={Underline}
-              label={t('underline')}
-              isActive={checkFormatActive('underline')}
-              onClick={() => handleFormatClick('underline')}
-            />
+                {/* Underline */}
+                <ToolbarButton
+                  icon={Underline}
+                  label={t('underline')}
+                  isActive={checkFormatActive('underline')}
+                  onClick={() => handleFormatClick('underline')}
+                />
 
-            {/* Strikethrough */}
-            <ToolbarButton
-              icon={Strikethrough}
-              label={t('strikethrough')}
-              isActive={checkFormatActive('strikethrough')}
-              onClick={() => handleFormatClick('strikeThrough')}
-            />
+                {/* Strikethrough */}
+                <ToolbarButton
+                  icon={Strikethrough}
+                  label={t('strikethrough')}
+                  isActive={checkFormatActive('strikethrough')}
+                  onClick={() => handleFormatClick('strikeThrough')}
+                />
 
-            <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
+                <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
 
-            {/* Font Size */}
-            <div className="relative">
-              <motion.button
-                type="button"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setShowFontSize(!showFontSize);
-                }}
-                className="p-2 rounded-lg flex items-center gap-1 transition-all"
-                style={{
-                  backgroundColor: 'var(--color-bgTertiary)',
-                  color: 'var(--color-text)',
-                }}
-                title={t('fontSize')}
-              >
-                <Type size={18} />
-                <span className="text-xs">{currentFontSize}</span>
-                <ChevronDown size={14} />
-              </motion.button>
-
-              <AnimatePresence>
-                {showFontSize && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="absolute top-full mt-2 rounded-lg shadow-lg overflow-hidden z-10"
-                    style={{
-                      backgroundColor: 'var(--color-bgSecondary)',
-                      border: `1px solid var(--color-border)`,
+                {/* Font Size */}
+                <div className="relative">
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowFontSize(!showFontSize);
                     }}
+                    className="p-2 rounded-lg flex items-center gap-1 transition-all"
+                    style={{
+                      backgroundColor: 'var(--color-bgTertiary)',
+                      color: 'var(--color-text)',
+                    }}
+                    title={t('fontSize')}
                   >
-                    <div className="max-h-48 overflow-y-auto">
-                      {fontSizes.map((size) => (
-                        <motion.button
-                          key={size}
-                          type="button"
-                          whileHover={{ backgroundColor: 'var(--color-bgTertiary)' }}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleFontSizeChange(size);
-                          }}
-                          className="w-full px-4 py-2 text-left text-sm transition-colors"
-                          style={{
-                            color:
-                              size === currentFontSize
-                                ? 'var(--color-accent)'
-                                : 'var(--color-text)',
-                            fontWeight: size === currentFontSize ? 'bold' : 'normal',
-                          }}
-                        >
-                          {size}px
-                        </motion.button>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+                    <Type size={18} />
+                    <span className="text-xs">{currentFontSize}</span>
+                    <ChevronDown size={14} />
+                  </motion.button>
 
-            <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
-
-            {/* H1 */}
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onMouseDown={(e) => {
-                e.preventDefault();
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleHeadingClick('h1');
-              }}
-              className={`toolbar-btn px-3 py-2 rounded-lg transition-all font-bold text-sm ${
-                checkHeadingActive('h1') ? 'is-active' : ''
-              }`}
-              style={{
-                backgroundColor: checkHeadingActive('h1')
-                  ? 'var(--color-accent)'
-                  : 'var(--color-bgTertiary)',
-                color: checkHeadingActive('h1') ? 'white' : 'var(--color-text)',
-              }}
-              title="Heading 1"
-            >
-              H1
-            </motion.button>
-
-            {/* H2 */}
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onMouseDown={(e) => {
-                e.preventDefault();
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleHeadingClick('h2');
-              }}
-              className={`toolbar-btn px-3 py-2 rounded-lg transition-all font-bold text-sm ${
-                checkHeadingActive('h2') ? 'is-active' : ''
-              }`}
-              style={{
-                backgroundColor: checkHeadingActive('h2')
-                  ? 'var(--color-accent)'
-                  : 'var(--color-bgTertiary)',
-                color: checkHeadingActive('h2') ? 'white' : 'var(--color-text)',
-              }}
-              title="Heading 2"
-            >
-              H2
-            </motion.button>
-
-            {/* H3 */}
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onMouseDown={(e) => {
-                e.preventDefault();
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleHeadingClick('h3');
-              }}
-              className={`toolbar-btn px-3 py-2 rounded-lg transition-all font-bold text-sm ${
-                checkHeadingActive('h3') ? 'is-active' : ''
-              }`}
-              style={{
-                backgroundColor: checkHeadingActive('h3')
-                  ? 'var(--color-accent)'
-                  : 'var(--color-bgTertiary)',
-                color: checkHeadingActive('h3') ? 'white' : 'var(--color-text)',
-              }}
-              title="Heading 3"
-            >
-              H3
-            </motion.button>
-
-            <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
-
-            {/* Bullet List */}
-            <ToolbarButton
-              icon={List}
-              label={t('bulletList')}
-              isActive={checkListActive('ul')}
-              onClick={() => handleListClick('ul')}
-            />
-
-            {/* Numbered List */}
-            <ToolbarButton
-              icon={ListOrdered}
-              label={t('numberedList')}
-              isActive={checkListActive('ol')}
-              onClick={() => handleListClick('ol')}
-            />
-
-            <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
-
-            {/* Code Block */}
-            <motion.button
-              type="button"
-              disabled={!isEditorFocused}
-              whileHover={isEditorFocused ? { scale: 1.05 } : {}}
-              whileTap={isEditorFocused ? { scale: 0.95 } : {}}
-              onMouseDown={(e) => {
-                e.preventDefault();
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (isEditorFocused) {
-                  handleCodeBlock();
-                }
-              }}
-              className="p-2 rounded-lg transition-all"
-              style={{
-                backgroundColor: 'var(--color-bgTertiary)',
-                color: 'var(--color-text)',
-                opacity: isEditorFocused ? 1 : 0.5,
-                cursor: isEditorFocused ? 'pointer' : 'not-allowed',
-              }}
-              title={isEditorFocused ? "Code Block" : "Focus editor to use Code Block"}
-            >
-              <Code size={18} />
-            </motion.button>
-
-            <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
-
-            {/* Dikte Butonu */}
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={toggleDictation}
-              className="p-2 rounded-lg transition-all relative"
-              style={{
-                backgroundColor: isDictating ? '#ef4444' : 'var(--color-bgTertiary)',
-                color: isDictating ? 'white' : 'var(--color-text)',
-              }}
-              title={isDictating ? 'Dikteyi Durdur' : 'Dikte Başlat'}
-            >
-              <Mic size={18} />
-              {isDictating && (
-                <motion.div
-                  className="absolute inset-0 rounded-lg"
-                  animate={{
-                    boxShadow: [
-                      '0 0 0 0 rgba(239, 68, 68, 0.7)',
-                      '0 0 0 10px rgba(239, 68, 68, 0)',
-                    ],
-                  }}
-                  transition={{
-                    duration: 1.5,
-                    repeat: Infinity,
-                  }}
-                />
-              )}
-            </motion.button>
-
-            {/* Ses Kaydetme Butonu */}
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={toggleRecording}
-              className="p-2 rounded-lg transition-all relative"
-              style={{
-                backgroundColor: isRecording ? '#ef4444' : 'var(--color-bgTertiary)',
-                color: isRecording ? 'white' : 'var(--color-text)',
-              }}
-              title={isRecording ? 'Kaydı Durdur' : 'Ses Kaydet'}
-            >
-              <Square size={18} fill={isRecording ? 'white' : 'none'} />
-              {isRecording && (
-                <motion.div
-                  className="absolute inset-0 rounded-lg"
-                  animate={{
-                    boxShadow: [
-                      '0 0 0 0 rgba(239, 68, 68, 0.7)',
-                      '0 0 0 10px rgba(239, 68, 68, 0)',
-                    ],
-                  }}
-                  transition={{
-                    duration: 1.5,
-                    repeat: Infinity,
-                  }}
-                />
-              )}
-            </motion.button>
-          </div>
-
-          {/* Actions - aligned to the right */}
-          <div className="flex items-center gap-2 ml-auto">
-            {/* Export Button */}
-            {/* Lock/Unlock Button - Only show if security is enabled */}
-            {security.isEnabled && (
-              <motion.button
-                type="button"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (isNoteEncrypted && isNoteUnlocked) {
-                    handleLockNoteManually();
-                  } else if (!isNoteEncrypted) {
-                    handleLockNote();
-                  }
-                }}
-                className="px-4 py-2 rounded-lg font-medium flex items-center gap-2"
-                style={{
-                  backgroundColor: isNoteEncrypted ? '#f59e0b' : 'var(--color-accent)',
-                  color: 'white',
-                }}
-                title={isNoteEncrypted && isNoteUnlocked ? t('lockNote') : t('lockNote')}
-              >
-                {isNoteEncrypted && isNoteUnlocked ? (
-                  <>
-                    <Lock size={18} />
-                    {t('lockNote')}
-                  </>
-                ) : isNoteEncrypted ? (
-                  <>
-                    <Lock size={18} />
-                    Locked
-                  </>
-                ) : (
-                  <>
-                    <Unlock size={18} />
-                    {t('lockNote')}
-                  </>
-                )}
-              </motion.button>
-            )}
-
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={(e) => {
-                e.preventDefault();
-                handleExportNote();
-              }}
-              className="px-4 py-2 rounded-lg font-medium flex items-center gap-2"
-              style={{
-                backgroundColor: 'var(--color-bgTertiary)',
-                color: 'var(--color-text)',
-                border: `1px solid var(--color-border)`,
-              }}
-              title="Export"
-            >
-              <FileDown size={18} />
-              Export
-            </motion.button>
-
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={(e) => {
-                e.preventDefault();
-                setShowDeleteConfirm(true);
-              }}
-              className="px-4 py-2 rounded-lg font-medium flex items-center gap-2"
-              style={{
-                backgroundColor: 'var(--color-danger)',
-                color: 'white',
-              }}
-            >
-              <Trash2 size={18} />
-              {t('delete')}
-            </motion.button>
-
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={(e) => {
-                e.preventDefault();
-                handleSave();
-              }}
-              className="px-4 py-2 rounded-lg font-medium flex items-center gap-2"
-              style={{
-                backgroundColor: 'var(--color-success)',
-                color: 'white',
-              }}
-            >
-              <Save size={18} />
-              {t('save')}
-            </motion.button>
-          </div>
-        </div>
-
-        {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto h-full relative">
-          {/* Encrypted Note Overlay */}
-          {isNoteEncrypted && !isNoteUnlocked && (
-            <EncryptedNoteOverlay
-              onUnlock={handleUnlockNote}
-              passwordHint={security.passwordHint}
-            />
-          )}
-
-          {/* Title Input - Ghost Style */}
-          <div className="px-6 pt-6 pb-4">
-            <input
-              ref={titleRef}
-              type="text"
-              value={title}
-              onChange={(e) => {
-                const newTitle = e.target.value;
-                setTitle(newTitle);
-                if (activeNoteId) {
-                  updateNote(activeNoteId, { title: newTitle });
-                }
-              }}
-              onFocus={() => setIsEditorFocused(false)}
-              placeholder={t('untitledNote')}
-              className="w-full text-3xl font-bold bg-transparent outline-none border-none focus:outline-none focus:ring-0"
-              style={{ color: 'var(--color-text)' }}
-            />
-          </div>
-
-          {/* Tag Input Area */}
-          {activeNote && (
-            <div className="px-6 pb-4">
-              <TagInput
-                tags={tags}
-                onAddTag={handleAddTag}
-                onRemoveTag={handleRemoveTag}
-              />
-            </div>
-          )}
-
-          {/* Separator Line */}
-          <div className="px-6">
-            <hr style={{ borderColor: 'var(--color-border)', opacity: 0.3 }} />
-          </div>
-
-          {/* File Attachment Display */}
-          {activeNote?.attachment && fileUrl && (
-            <div className="px-4 pt-4 pb-4 flex flex-col h-full" style={{ minHeight: 'calc(100vh - 150px)' }}>
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="rounded-xl overflow-hidden flex flex-col flex-1"
-                style={{
-                  backgroundColor: 'var(--color-bgSecondary)',
-                  border: `1px solid var(--color-border)`,
-                  minHeight: 'calc(100vh - 180px)',
-                }}
-              >
-                {/* Attachment Header */}
-                <div
-                  className="flex-none px-4 py-3 flex items-center justify-between"
-                  style={{ backgroundColor: 'var(--color-bgTertiary)' }}
-                >
-                  <div className="flex items-center gap-3">
-                    <Paperclip size={20} style={{ color: 'var(--color-accent)' }} />
-                    <div>
-                      <p className="font-semibold text-sm" style={{ color: 'var(--color-text)' }}>
-                        {activeNote.attachment.name}
-                      </p>
-                      <p className="text-xs" style={{ color: 'var(--color-textSecondary)' }}>
-                        {(activeNote.attachment.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <motion.a
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      href={fileUrl}
-                      download={activeNote.attachment.name}
-                      className="p-2 rounded-lg"
-                      style={{
-                        backgroundColor: 'var(--color-accent)',
-                        color: 'white',
-                      }}
-                      title="İndir"
-                    >
-                      <Download size={18} />
-                    </motion.a>
-                    <motion.button
-                      type="button"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => {
-                        if (activeNoteId) {
-                          updateNote(activeNoteId, { attachment: undefined });
-                        }
-                      }}
-                      className="p-2 rounded-lg"
-                      style={{
-                        backgroundColor: 'var(--color-danger)',
-                        color: 'white',
-                      }}
-                      title="Dosyayı Kaldır"
-                    >
-                      <X size={18} />
-                    </motion.button>
-                  </div>
+                  <AnimatePresence>
+                    {showFontSize && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="absolute top-full mt-2 rounded-lg shadow-lg overflow-hidden z-10"
+                        style={{
+                          backgroundColor: 'var(--color-bgSecondary)',
+                          border: `1px solid var(--color-border)`,
+                        }}
+                      >
+                        <div className="max-h-48 overflow-y-auto">
+                          {fontSizes.map((size) => (
+                            <motion.button
+                              key={size}
+                              type="button"
+                              whileHover={{ backgroundColor: 'var(--color-bgTertiary)' }}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleFontSizeChange(size);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm transition-colors"
+                              style={{
+                                color:
+                                  size === currentFontSize
+                                    ? 'var(--color-accent)'
+                                    : 'var(--color-text)',
+                                fontWeight: size === currentFontSize ? 'bold' : 'normal',
+                              }}
+                            >
+                              {size}px
+                            </motion.button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
-                {/* File Preview (for PDFs and text files) */}
-                {activeNote.attachment.type === 'application/pdf' && (
-                  <div className="flex-1 w-full h-full" style={{ minHeight: 'calc(100vh - 250px)' }}>
-                    {fileUrl ? (
-                      <iframe
-                        key={fileUrl || `${activeNote.id}-pdf`}
-                        src={fileUrl}
-                        className="w-full h-full border-none"
-                        title={activeNote.attachment.name}
-                        style={{ display: 'block', minHeight: 'calc(100vh - 250px)' }}
-                      />
-                    ) : (
-                      <div
-                        className="w-full h-full flex items-center justify-center text-sm"
-                        style={{ color: 'var(--color-textSecondary)' }}
-                      >
-                        Dosya bulunamadı veya geçersiz dosya biçimi.
-                      </div>
-                    )}
-                  </div>
-                )}
-                {activeNote.attachment.type.startsWith('text/') && (
-                  <div className="flex-1 w-full h-full" style={{ minHeight: 'calc(100vh - 250px)' }}>
-                    {fileUrl ? (
-                      <iframe
-                        key={fileUrl || `${activeNote.id}-text`}
-                        src={fileUrl}
-                        className="w-full h-full border-none"
-                        title={activeNote.attachment.name}
-                        style={{ display: 'block', minHeight: 'calc(100vh - 250px)' }}
-                      />
-                    ) : (
-                      <div
-                        className="w-full h-full flex items-center justify-center text-sm"
-                        style={{ color: 'var(--color-textSecondary)' }}
-                      >
-                        Dosya bulunamadı veya geçersiz dosya biçimi.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </motion.div>
-            </div>
-          )}
+                <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
 
-          {/* Content Editor */}
-          <div className="px-6 pb-6 pt-4">
-            <div
-              id="editor-content"
-              ref={contentRef}
-              contentEditable
-              className="editor-content min-h-full outline-none"
-              data-placeholder={t('startTyping')}
-              style={{
-                color: 'var(--color-text)',
-                fontSize: `${currentFontSize}px`,
-              }}
-              onFocus={() => setIsEditorFocused(true)}
-              onBlur={(e) => {
-                // Only set to false if focus is not moving to another element in the editor
-                const relatedTarget = e.relatedTarget as HTMLElement;
-                if (!relatedTarget || !contentRef.current?.contains(relatedTarget)) {
-                  setIsEditorFocused(false);
-                }
-                saveCursorPosition();
-              }}
-              onInput={(e) => {
-                // Update local state and store immediately
-                const newContent = e.currentTarget.innerHTML;
-                setContent(newContent);
-                
-                // Update store immediately (debounced save will handle persistence)
-                if (activeNoteId) {
-                  updateNote(activeNoteId, { content: newContent });
-                }
-                
-                // Biçim durumunu hemen güncelle
-                syncToolbarState();
-                
-                // Handle inline markdown formatting (**bold**, *italic*, ~~strikethrough~~, `code`)
-                const selection = window.getSelection();
-                if (!selection || selection.rangeCount === 0) return;
-                
-                const range = selection.getRangeAt(0);
-                const textNode = range.startContainer;
-                
-                if (textNode.nodeType !== Node.TEXT_NODE) return;
-                
-                const text = textNode.textContent || '';
-                const cursorPos = range.startOffset;
-                
-                // **text** or __text__ → Bold
-                const boldPattern1 = /\*\*([^\*]+)\*\*$/;
-                const boldPattern2 = /__([^_]+)__$/;
-                const textBeforeCursor = text.substring(0, cursorPos);
-                
-                const boldMatch1 = textBeforeCursor.match(boldPattern1);
-                const boldMatch2 = textBeforeCursor.match(boldPattern2);
-                
-                if (boldMatch1) {
-                  const matchText = boldMatch1[1];
-                  const matchStart = cursorPos - boldMatch1[0].length;
-                  
-                  // Remove the markdown syntax
-                  const newText = text.substring(0, matchStart) + matchText + text.substring(cursorPos);
-                  textNode.textContent = newText;
-                  
-                  // Select the text
-                  range.setStart(textNode, matchStart);
-                  range.setEnd(textNode, matchStart + matchText.length);
-                  selection.removeAllRanges();
-                  selection.addRange(range);
-                  
-                  // Apply bold
-                  document.execCommand('bold', false);
-                  
-                  // Move cursor to end
-                  range.collapse(false);
-                  return;
-                }
-                
-                if (boldMatch2) {
-                  const matchText = boldMatch2[1];
-                  const matchStart = cursorPos - boldMatch2[0].length;
-                  
-                  const newText = text.substring(0, matchStart) + matchText + text.substring(cursorPos);
-                  textNode.textContent = newText;
-                  
-                  range.setStart(textNode, matchStart);
-                  range.setEnd(textNode, matchStart + matchText.length);
-                  selection.removeAllRanges();
-                  selection.addRange(range);
-                  
-                  document.execCommand('bold', false);
-                  range.collapse(false);
-                  return;
-                }
-                
-                // *text* or _text_ → Italic (but not ** or __)
-                const italicPattern1 = /(?<!\*)\*([^\*]+)\*(?!\*)$/;
-                const italicPattern2 = /(?<!_)_([^_]+)_(?!_)$/;
-                
-                const italicMatch1 = textBeforeCursor.match(italicPattern1);
-                const italicMatch2 = textBeforeCursor.match(italicPattern2);
-                
-                if (italicMatch1) {
-                  const matchText = italicMatch1[1];
-                  const matchStart = cursorPos - italicMatch1[0].length;
-                  
-                  const newText = text.substring(0, matchStart) + matchText + text.substring(cursorPos);
-                  textNode.textContent = newText;
-                  
-                  range.setStart(textNode, matchStart);
-                  range.setEnd(textNode, matchStart + matchText.length);
-                  selection.removeAllRanges();
-                  selection.addRange(range);
-                  
-                  document.execCommand('italic', false);
-                  range.collapse(false);
-                  return;
-                }
-                
-                if (italicMatch2) {
-                  const matchText = italicMatch2[1];
-                  const matchStart = cursorPos - italicMatch2[0].length;
-                  
-                  const newText = text.substring(0, matchStart) + matchText + text.substring(cursorPos);
-                  textNode.textContent = newText;
-                  
-                  range.setStart(textNode, matchStart);
-                  range.setEnd(textNode, matchStart + matchText.length);
-                  selection.removeAllRanges();
-                  selection.addRange(range);
-                  
-                  document.execCommand('italic', false);
-                  range.collapse(false);
-                  return;
-                }
-                
-                // ~~text~~ → Strikethrough
-                const strikePattern = /~~([^~]+)~~$/;
-                const strikeMatch = textBeforeCursor.match(strikePattern);
-                
-                if (strikeMatch) {
-                  const matchText = strikeMatch[1];
-                  const matchStart = cursorPos - strikeMatch[0].length;
-                  
-                  const newText = text.substring(0, matchStart) + matchText + text.substring(cursorPos);
-                  textNode.textContent = newText;
-                  
-                  range.setStart(textNode, matchStart);
-                  range.setEnd(textNode, matchStart + matchText.length);
-                  selection.removeAllRanges();
-                  selection.addRange(range);
-                  
-                  document.execCommand('strikeThrough', false);
-                  range.collapse(false);
-                  return;
-                }
-                
-                // `text` → Inline Code (wrapped in <code> tag)
-                const codePattern = /`([^`]+)`$/;
-                const codeMatch = textBeforeCursor.match(codePattern);
-                
-                if (codeMatch) {
-                  const matchText = codeMatch[1];
-                  const matchStart = cursorPos - codeMatch[0].length;
-                  
-                  const newText = text.substring(0, matchStart) + matchText + text.substring(cursorPos);
-                  textNode.textContent = newText;
-                  
-                  // Create a <code> element for inline code
-                  const codeElement = document.createElement('code');
-                  codeElement.textContent = matchText;
-                  codeElement.style.backgroundColor = '#1e293b';
-                  codeElement.style.color = '#e2e8f0';
-                  codeElement.style.padding = '2px 6px';
-                  codeElement.style.borderRadius = '4px';
-                  codeElement.style.fontFamily = "'Fira Code', 'Courier New', monospace";
-                  codeElement.style.fontSize = '0.9em';
-                  
-                  // Replace the text with the code element
-                  range.setStart(textNode, matchStart);
-                  range.setEnd(textNode, matchStart + matchText.length);
-                  range.deleteContents();
-                  range.insertNode(codeElement);
-                  
-                  // Move cursor after the code element
-                  range.setStartAfter(codeElement);
-                  range.collapse(true);
-                  selection.removeAllRanges();
-                  selection.addRange(range);
-                  
-                  // Add a space after for better UX
-                  const spaceNode = document.createTextNode(' ');
-                  range.insertNode(spaceNode);
-                  range.setStartAfter(spaceNode);
-                  range.collapse(true);
-                  selection.removeAllRanges();
-                  selection.addRange(range);
-                  
-                  return;
-                }
-              }}
-              onKeyDown={(e) => {
-                // Handle Tab key to insert 4 spaces
-                if (e.key === 'Tab') {
-                  e.preventDefault();
-                  document.execCommand('insertText', false, '    ');
-                }
-
-                // Helper function to check if cursor is inside a code block
-                const isInCodeBlock = (): HTMLPreElement | null => {
-                  const selection = window.getSelection();
-                  if (!selection || selection.rangeCount === 0) return null;
-                  
-                  let node = selection.anchorNode;
-                  if (!node) return null;
-                  
-                  let currentNode: Node | null = node;
-                  while (currentNode && currentNode !== contentRef.current) {
-                    if (currentNode.nodeType === Node.ELEMENT_NODE) {
-                      const element = currentNode as HTMLElement;
-                      if (element.tagName === 'PRE') {
-                        return element as HTMLPreElement;
-                      }
-                    }
-                    currentNode = currentNode.parentNode;
-                  }
-                  return null;
-                };
-
-                // Helper function to check if cursor is at the end of the code block
-                const isCursorAtEndOfCodeBlock = (preElement: HTMLPreElement): boolean => {
-                  const selection = window.getSelection();
-                  if (!selection || selection.rangeCount === 0) return false;
-                  
-                  const range = selection.getRangeAt(0);
-                  const codeElement = preElement.querySelector('code');
-                  if (!codeElement) return false;
-                  
-                  // Get the text content and cursor position
-                  const textContent = codeElement.textContent || '';
-                  const preCaretRange = range.cloneRange();
-                  preCaretRange.selectNodeContents(codeElement);
-                  preCaretRange.setEnd(range.endContainer, range.endOffset);
-                  const caretPosition = preCaretRange.toString().length;
-                  
-                  // Check if cursor is at the very end
-                  return caretPosition >= textContent.length;
-                };
-
-                // Helper function to insert a paragraph after the code block and focus it
-                const exitCodeBlock = (preElement: HTMLPreElement) => {
-                  e.preventDefault();
-                  
-                  // Create a new paragraph
-                  const newParagraph = document.createElement('p');
-                  newParagraph.innerHTML = '<br>'; // Add a br to make it visible and focusable
-                  
-                  // Insert the paragraph after the code block
-                  if (preElement.parentNode) {
-                    preElement.parentNode.insertBefore(newParagraph, preElement.nextSibling);
-                    
-                    // Move cursor to the new paragraph
-                    const range = document.createRange();
-                    const sel = window.getSelection();
-                    range.setStart(newParagraph, 0);
-                    range.collapse(true);
-                    sel?.removeAllRanges();
-                    sel?.addRange(range);
-                    
-                    // Update content state
-                    if (contentRef.current) {
-                      setContent(contentRef.current.innerHTML);
-                    }
-                  }
-                };
-
-                // Handle Enter key for code blocks FIRST (before Shift+Enter)
-                if (e.key === 'Enter') {
-                  const codeBlock = isInCodeBlock();
-                  if (codeBlock) {
-                    // ALWAYS prevent default to stop block splitting
+                {/* H1 */}
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                  }}
+                  onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
+                    handleHeadingClick('h1');
+                  }}
+                  className={`toolbar-btn px-3 py-2 rounded-lg transition-all font-bold text-sm ${
+                    checkHeadingActive('h1') ? 'is-active' : ''
+                  }`}
+                  style={{
+                    backgroundColor: checkHeadingActive('h1')
+                      ? 'var(--color-accent)'
+                      : 'var(--color-bgTertiary)',
+                    color: checkHeadingActive('h1') ? 'white' : 'var(--color-text)',
+                  }}
+                  title="Heading 1"
+                >
+                  H1
+                </motion.button>
+
+                {/* H2 */}
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleHeadingClick('h2');
+                  }}
+                  className={`toolbar-btn px-3 py-2 rounded-lg transition-all font-bold text-sm ${
+                    checkHeadingActive('h2') ? 'is-active' : ''
+                  }`}
+                  style={{
+                    backgroundColor: checkHeadingActive('h2')
+                      ? 'var(--color-accent)'
+                      : 'var(--color-bgTertiary)',
+                    color: checkHeadingActive('h2') ? 'white' : 'var(--color-text)',
+                  }}
+                  title="Heading 2"
+                >
+                  H2
+                </motion.button>
+
+                {/* H3 */}
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleHeadingClick('h3');
+                  }}
+                  className={`toolbar-btn px-3 py-2 rounded-lg transition-all font-bold text-sm ${
+                    checkHeadingActive('h3') ? 'is-active' : ''
+                  }`}
+                  style={{
+                    backgroundColor: checkHeadingActive('h3')
+                      ? 'var(--color-accent)'
+                      : 'var(--color-bgTertiary)',
+                    color: checkHeadingActive('h3') ? 'white' : 'var(--color-text)',
+                  }}
+                  title="Heading 3"
+                >
+                  H3
+                </motion.button>
+
+                <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
+
+                {/* Bullet List */}
+                <ToolbarButton
+                  icon={List}
+                  label={t('bulletList')}
+                  isActive={checkListActive('ul')}
+                  onClick={() => handleListClick('ul')}
+                />
+
+                {/* Numbered List */}
+                <ToolbarButton
+                  icon={ListOrdered}
+                  label={t('numberedList')}
+                  isActive={checkListActive('ol')}
+                  onClick={() => handleListClick('ol')}
+                />
+
+                <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
+
+                {/* Code Block */}
+                <motion.button
+                  type="button"
+                  disabled={!isEditorFocused}
+                  whileHover={isEditorFocused ? { scale: 1.05 } : {}}
+                  whileTap={isEditorFocused ? { scale: 0.95 } : {}}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (isEditorFocused) {
+                      handleCodeBlock();
+                    }
+                  }}
+                  className="p-2 rounded-lg transition-all"
+                  style={{
+                    backgroundColor: 'var(--color-bgTertiary)',
+                    color: 'var(--color-text)',
+                    opacity: isEditorFocused ? 1 : 0.5,
+                    cursor: isEditorFocused ? 'pointer' : 'not-allowed',
+                  }}
+                  title={isEditorFocused ? "Code Block" : "Focus editor to use Code Block"}
+                >
+                  <Code size={18} />
+                </motion.button>
+
+                <div className="w-px h-6" style={{ backgroundColor: 'var(--color-border)' }} />
+
+                {/* Dikte Butonu */}
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={toggleDictation}
+                  className="p-2 rounded-lg transition-all relative"
+                  style={{
+                    backgroundColor: isDictating ? '#ef4444' : 'var(--color-bgTertiary)',
+                    color: isDictating ? 'white' : 'var(--color-text)',
+                  }}
+                  title={isDictating ? 'Dikteyi Durdur' : 'Dikte Başlat'}
+                >
+                  <Mic size={18} />
+                  {isDictating && (
+                    <motion.div
+                      className="absolute inset-0 rounded-lg"
+                      animate={{
+                        boxShadow: [
+                          '0 0 0 0 rgba(239, 68, 68, 0.7)',
+                          '0 0 0 10px rgba(239, 68, 68, 0)',
+                        ],
+                      }}
+                      transition={{
+                        duration: 1.5,
+                        repeat: Infinity,
+                      }}
+                    />
+                  )}
+                </motion.button>
+
+                {/* Ses Kaydetme Butonu */}
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={toggleRecording}
+                  className="p-2 rounded-lg transition-all relative"
+                  style={{
+                    backgroundColor: isRecording ? '#ef4444' : 'var(--color-bgTertiary)',
+                    color: isRecording ? 'white' : 'var(--color-text)',
+                  }}
+                  title={isRecording ? 'Kaydı Durdur' : 'Ses Kaydet'}
+                >
+                  <Square size={18} fill={isRecording ? 'white' : 'none'} />
+                  {isRecording && (
+                    <motion.div
+                      className="absolute inset-0 rounded-lg"
+                      animate={{
+                        boxShadow: [
+                          '0 0 0 0 rgba(239, 68, 68, 0.7)',
+                          '0 0 0 10px rgba(239, 68, 68, 0)',
+                        ],
+                      }}
+                      transition={{
+                        duration: 1.5,
+                        repeat: Infinity,
+                      }}
+                    />
+                  )}
+                </motion.button>
+              </div>
+
+              {/* Actions - aligned to the right */}
+              <div className="flex items-center gap-2 ml-auto">
+                {/* Export Button */}
+                {/* Lock/Unlock Button - Only show if security is enabled */}
+                {security.isEnabled && (
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (isNoteEncrypted && isNoteUnlocked) {
+                        handleLockNoteManually();
+                      } else if (!isNoteEncrypted) {
+                        handleLockNote();
+                      }
+                    }}
+                    className="px-4 py-2 rounded-lg font-medium flex items-center gap-2"
+                    style={{
+                      backgroundColor: isNoteEncrypted ? '#f59e0b' : 'var(--color-accent)',
+                      color: 'white',
+                    }}
+                    title={isNoteEncrypted && isNoteUnlocked ? t('lockNote') : t('lockNote')}
+                  >
+                    {isNoteEncrypted && isNoteUnlocked ? (
+                      <>
+                        <Lock size={18} />
+                        {t('lockNote')}
+                      </>
+                    ) : isNoteEncrypted ? (
+                      <>
+                        <Lock size={18} />
+                        Locked
+                      </>
+                    ) : (
+                      <>
+                        <Unlock size={18} />
+                        {t('lockNote')}
+                      </>
+                    )}
+                  </motion.button>
+                )}
+
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleExportNote();
+                  }}
+                  className="px-4 py-2 rounded-lg font-medium flex items-center gap-2"
+                  style={{
+                    backgroundColor: 'var(--color-bgTertiary)',
+                    color: 'var(--color-text)',
+                    border: `1px solid var(--color-border)`,
+                  }}
+                  title="Export"
+                >
+                  <FileDown size={18} />
+                  Export
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setShowDeleteConfirm(true);
+                  }}
+                  className="px-4 py-2 rounded-lg font-medium flex items-center gap-2"
+                  style={{
+                    backgroundColor: 'var(--color-danger)',
+                    color: 'white',
+                  }}
+                >
+                  <Trash2 size={18} />
+                  {t('delete')}
+                </motion.button>
+
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleSave();
+                  }}
+                  className="px-4 py-2 rounded-lg font-medium flex items-center gap-2"
+                  style={{
+                    backgroundColor: 'var(--color-success)',
+                    color: 'white',
+                  }}
+                >
+                  <Save size={18} />
+                  {t('save')}
+                </motion.button>
+              </div>
+            </div>
+
+            {/* Scrollable Content Area */}
+            <div className="flex-1 overflow-y-auto h-full relative">
+              {/* Encrypted Note Overlay */}
+              {isNoteEncrypted && !isNoteUnlocked && (
+                <EncryptedNoteOverlay
+                  onUnlock={handleUnlockNote}
+                  passwordHint={security.passwordHint}
+                />
+              )}
+
+              {/* Title Input - Ghost Style */}
+              <div className="px-6 pt-6 pb-4">
+                <input
+                  ref={titleRef}
+                  type="text"
+                  value={title}
+                  onChange={(e) => {
+                    const newTitle = e.target.value;
+                    setTitle(newTitle);
+                    if (activeNoteId) {
+                      updateNote(activeNoteId, { title: newTitle });
+                    }
+                  }}
+                  onFocus={() => setIsEditorFocused(false)}
+                  placeholder={t('untitledNote')}
+                  className="w-full text-3xl font-bold bg-transparent outline-none border-none focus:outline-none focus:ring-0"
+                  style={{ color: 'var(--color-text)' }}
+                />
+              </div>
+
+              {/* Tag Input Area */}
+              {activeNote && (
+                <div className="px-6 pb-4">
+                  <TagInput
+                    tags={tags}
+                    onAddTag={handleAddTag}
+                    onRemoveTag={handleRemoveTag}
+                  />
+                </div>
+              )}
+
+              {/* Separator Line */}
+              <div className="px-6">
+                <hr style={{ borderColor: 'var(--color-border)', opacity: 0.3 }} />
+              </div>
+
+              {/* Content Editor */}
+              <div className="px-6 pb-6 pt-4">
+                <div
+                  id="editor-content"
+                  ref={contentRef}
+                  contentEditable
+                  className="editor-content min-h-full outline-none"
+                  data-placeholder={t('startTyping')}
+                  style={{
+                    color: 'var(--color-text)',
+                    fontSize: `${currentFontSize}px`,
+                  }}
+                  onFocus={() => setIsEditorFocused(true)}
+                  onBlur={(e) => {
+                    // Only set to false if focus is not moving to another element in the editor
+                    const relatedTarget = e.relatedTarget as HTMLElement;
+                    if (!relatedTarget || !contentRef.current?.contains(relatedTarget)) {
+                      setIsEditorFocused(false);
+                    }
+                    saveCursorPosition();
+                  }}
+                  onInput={(e) => {
+                    // Update local state and store immediately
+                    const newContent = e.currentTarget.innerHTML;
+                    setContent(newContent);
                     
-                    if (e.shiftKey) {
-                      // Shift+Enter: Break out of code block
-                      exitCodeBlock(codeBlock);
-                      return;
-                    } else {
-                      // Normal Enter: Insert newline inside the block
-                      const selection = window.getSelection();
-                      if (!selection || selection.rangeCount === 0) return;
+                    // Update store immediately (debounced save will handle persistence)
+                    if (activeNoteId) {
+                      updateNote(activeNoteId, { content: newContent });
+                    }
+                    
+                    // Biçim durumunu hemen güncelle
+                    syncToolbarState();
+                    
+                    // Handle inline markdown formatting (**bold**, *italic*, ~~strikethrough~~, `code`)
+                    const selection = window.getSelection();
+                    if (!selection || selection.rangeCount === 0) return;
+                    
+                    const range = selection.getRangeAt(0);
+                    const textNode = range.startContainer;
+                    
+                    if (textNode.nodeType !== Node.TEXT_NODE) return;
+                    
+                    const text = textNode.textContent || '';
+                    const cursorPos = range.startOffset;
+                    
+                    // **text** or __text__ → Bold
+                    const boldPattern1 = /\*\*([^\*]+)\*\*$/;
+                    const boldPattern2 = /__([^_]+)__$/;
+                    const textBeforeCursor = text.substring(0, cursorPos);
+                    
+                    const boldMatch1 = textBeforeCursor.match(boldPattern1);
+                    const boldMatch2 = textBeforeCursor.match(boldPattern2);
+                    
+                    if (boldMatch1) {
+                      const matchText = boldMatch1[1];
+                      const matchStart = cursorPos - boldMatch1[0].length;
                       
-                      const range = selection.getRangeAt(0);
+                      // Remove the markdown syntax
+                      const newText = text.substring(0, matchStart) + matchText + text.substring(cursorPos);
+                      textNode.textContent = newText;
                       
-                      // Find the <code> element inside the <pre>
-                      const codeElement = codeBlock.querySelector('code');
-                      if (!codeElement) return;
-                      
-                      // Delete any selected content first
-                      range.deleteContents();
-                      
-                      // Create a newline text node
-                      const newline = document.createTextNode('\n');
-                      range.insertNode(newline);
-                      
-                      // Move cursor after the newline
-                      range.setStartAfter(newline);
-                      range.setEndAfter(newline);
-                      range.collapse(false);
-                      
+                      // Select the text
+                      range.setStart(textNode, matchStart);
+                      range.setEnd(textNode, matchStart + matchText.length);
                       selection.removeAllRanges();
                       selection.addRange(range);
                       
-                      // Force focus back to the code element
-                      codeElement.focus();
+                      // Apply bold
+                      document.execCommand('bold', false);
                       
-                      // Update content state
-                      if (contentRef.current) {
-                        setContent(contentRef.current.innerHTML);
-                      }
+                      // Move cursor to end
+                      range.collapse(false);
+                      return;
+                    }
+                    
+                    if (boldMatch2) {
+                      const matchText = boldMatch2[1];
+                      const matchStart = cursorPos - boldMatch2[0].length;
                       
-                      // Trigger a manual input event to update the state
-                      const inputEvent = new Event('input', { bubbles: true });
-                      contentRef.current?.dispatchEvent(inputEvent);
+                      const newText = text.substring(0, matchStart) + matchText + text.substring(cursorPos);
+                      textNode.textContent = newText;
+                      
+                      range.setStart(textNode, matchStart);
+                      range.setEnd(textNode, matchStart + matchText.length);
+                      selection.removeAllRanges();
+                      selection.addRange(range);
+                      
+                      document.execCommand('bold', false);
+                      range.collapse(false);
+                      return;
+                    }
+                    
+                    // *text* or _text_ → Italic (but not ** or __)
+                    const italicPattern1 = /(?<!\*)\*([^\*]+)\*(?!\*)$/;
+                    const italicPattern2 = /(?<!_)_([^_]+)_(?!_)$/;
+                    
+                    const italicMatch1 = textBeforeCursor.match(italicPattern1);
+                    const italicMatch2 = textBeforeCursor.match(italicPattern2);
+                    
+                    if (italicMatch1) {
+                      const matchText = italicMatch1[1];
+                      const matchStart = cursorPos - italicMatch1[0].length;
+                      
+                      const newText = text.substring(0, matchStart) + matchText + text.substring(cursorPos);
+                      textNode.textContent = newText;
+                      
+                      range.setStart(textNode, matchStart);
+                      range.setEnd(textNode, matchStart + matchText.length);
+                      selection.removeAllRanges();
+                      selection.addRange(range);
+                      
+                      document.execCommand('italic', false);
+                      range.collapse(false);
+                      return;
+                    }
+                    
+                    if (italicMatch2) {
+                      const matchText = italicMatch2[1];
+                      const matchStart = cursorPos - italicMatch2[0].length;
+                      
+                      const newText = text.substring(0, matchStart) + matchText + text.substring(cursorPos);
+                      textNode.textContent = newText;
+                      
+                      range.setStart(textNode, matchStart);
+                      range.setEnd(textNode, matchStart + matchText.length);
+                      selection.removeAllRanges();
+                      selection.addRange(range);
+                      
+                      document.execCommand('italic', false);
+                      range.collapse(false);
+                      return;
+                    }
+                    
+                    // ~~text~~ → Strikethrough
+                    const strikePattern = /~~([^~]+)~~$/;
+                    const strikeMatch = textBeforeCursor.match(strikePattern);
+                    
+                    if (strikeMatch) {
+                      const matchText = strikeMatch[1];
+                      const matchStart = cursorPos - strikeMatch[0].length;
+                      
+                      const newText = text.substring(0, matchStart) + matchText + text.substring(cursorPos);
+                      textNode.textContent = newText;
+                      
+                      range.setStart(textNode, matchStart);
+                      range.setEnd(textNode, matchStart + matchText.length);
+                      selection.removeAllRanges();
+                      selection.addRange(range);
+                      
+                      document.execCommand('strikeThrough', false);
+                      range.collapse(false);
+                      return;
+                    }
+                    
+                    // `text` → Inline Code (wrapped in <code> tag)
+                    const codePattern = /`([^`]+)`$/;
+                    const codeMatch = textBeforeCursor.match(codePattern);
+                    
+                    if (codeMatch) {
+                      const matchText = codeMatch[1];
+                      const matchStart = cursorPos - codeMatch[0].length;
+                      
+                      const newText = text.substring(0, matchStart) + matchText + text.substring(cursorPos);
+                      textNode.textContent = newText;
+                      
+                      // Create a <code> element for inline code
+                      const codeElement = document.createElement('code');
+                      codeElement.textContent = matchText;
+                      codeElement.style.backgroundColor = '#1e293b';
+                      codeElement.style.color = '#e2e8f0';
+                      codeElement.style.padding = '2px 6px';
+                      codeElement.style.borderRadius = '4px';
+                      codeElement.style.fontFamily = "'Fira Code', 'Courier New', monospace";
+                      codeElement.style.fontSize = '0.9em';
+                      
+                      // Replace the text with the code element
+                      range.setStart(textNode, matchStart);
+                      range.setEnd(textNode, matchStart + matchText.length);
+                      range.deleteContents();
+                      range.insertNode(codeElement);
+                      
+                      // Move cursor after the code element
+                      range.setStartAfter(codeElement);
+                      range.collapse(true);
+                      selection.removeAllRanges();
+                      selection.addRange(range);
+                      
+                      // Add a space after for better UX
+                      const spaceNode = document.createTextNode(' ');
+                      range.insertNode(spaceNode);
+                      range.setStartAfter(spaceNode);
+                      range.collapse(true);
+                      selection.removeAllRanges();
+                      selection.addRange(range);
                       
                       return;
                     }
-                  }
-                }
+                  }}
+                  onKeyDown={(e) => {
+                    // Handle Tab key to insert 4 spaces
+                    if (e.key === 'Tab') {
+                      e.preventDefault();
+                      document.execCommand('insertText', false, '    ');
+                    }
 
-                // Handle Arrow Down to exit code block when at the end
-                if (e.key === 'ArrowDown') {
-                  const codeBlock = isInCodeBlock();
-                  if (codeBlock && isCursorAtEndOfCodeBlock(codeBlock)) {
-                    // Check if there's a next sibling
-                    const nextSibling = codeBlock.nextSibling;
-                    if (!nextSibling) {
-                      // No next sibling, create a new paragraph
-                      exitCodeBlock(codeBlock);
-                    } else {
-                      // There's a next sibling, let the default behavior handle it
-                      // But we need to ensure the cursor moves to it
-                      e.preventDefault();
-                      const range = document.createRange();
-                      const sel = window.getSelection();
+                    // Helper function to check if cursor is inside a code block
+                    const isInCodeBlock = (): HTMLPreElement | null => {
+                      const selection = window.getSelection();
+                      if (!selection || selection.rangeCount === 0) return null;
                       
-                      // Try to set cursor at the start of the next sibling
-                      if (nextSibling.nodeType === Node.TEXT_NODE) {
-                        range.setStart(nextSibling, 0);
-                      } else if (nextSibling.nodeType === Node.ELEMENT_NODE) {
-                        range.setStart(nextSibling, 0);
+                      let node = selection.anchorNode;
+                      if (!node) return null;
+                      
+                      let currentNode: Node | null = node;
+                      while (currentNode && currentNode !== contentRef.current) {
+                        if (currentNode.nodeType === Node.ELEMENT_NODE) {
+                          const element = currentNode as HTMLElement;
+                          if (element.tagName === 'PRE') {
+                            return element as HTMLPreElement;
+                          }
+                        }
+                        currentNode = currentNode.parentNode;
                       }
-                      range.collapse(true);
-                      sel?.removeAllRanges();
-                      sel?.addRange(range);
-                    }
-                    return;
-                  }
-                }
-                
-                // Handle Enter key for lists - allow empty list items
-                if (e.key === 'Enter') {
-                  const selection = window.getSelection();
-                  if (!selection || selection.rangeCount === 0) return;
-                  
-                  let node = selection.anchorNode;
-                  if (!node) return;
-                  
-                  // Find the parent list item
-                  let listItem: HTMLElement | null = null;
-                  let currentNode: Node | null = node;
-                  
-                  while (currentNode && currentNode !== contentRef.current) {
-                    if (currentNode.nodeType === Node.ELEMENT_NODE) {
-                      const element = currentNode as HTMLElement;
-                      if (element.tagName === 'LI') {
-                        listItem = element;
-                        break;
-                      }
-                    }
-                    currentNode = currentNode.parentNode;
-                  }
-                  
-                  // If we're inside a list item
-                  if (listItem) {
-                    // Check if the list item is empty or only contains whitespace/br
-                    const textContent = listItem.textContent?.trim() || '';
-                    const hasOnlyBr = listItem.innerHTML.trim() === '<br>' || listItem.innerHTML.trim() === '';
-                    
-                    if (textContent === '' || hasOnlyBr) {
-                      // Prevent default behavior (which would exit the list)
+                      return null;
+                    };
+
+                    // Helper function to check if cursor is at the end of the code block
+                    const isCursorAtEndOfCodeBlock = (preElement: HTMLPreElement): boolean => {
+                      const selection = window.getSelection();
+                      if (!selection || selection.rangeCount === 0) return false;
+                      
+                      const range = selection.getRangeAt(0);
+                      const codeElement = preElement.querySelector('code');
+                      if (!codeElement) return false;
+                      
+                      // Get the text content and cursor position
+                      const textContent = codeElement.textContent || '';
+                      const preCaretRange = range.cloneRange();
+                      preCaretRange.selectNodeContents(codeElement);
+                      preCaretRange.setEnd(range.endContainer, range.endOffset);
+                      const caretPosition = preCaretRange.toString().length;
+                      
+                      // Check if cursor is at the very end
+                      return caretPosition >= textContent.length;
+                    };
+
+                    // Helper function to insert a paragraph after the code block and focus it
+                    const exitCodeBlock = (preElement: HTMLPreElement) => {
                       e.preventDefault();
                       
-                      // Create a new empty list item
-                      const newListItem = document.createElement('li');
-                      newListItem.innerHTML = '<br>'; // Add a br to make it visible
+                      // Create a new paragraph
+                      const newParagraph = document.createElement('p');
+                      newParagraph.innerHTML = '<br>'; // Add a br to make it visible and focusable
                       
-                      // Insert the new list item after the current one
-                      if (listItem.parentNode) {
-                        listItem.parentNode.insertBefore(newListItem, listItem.nextSibling);
+                      // Insert the paragraph after the code block
+                      if (preElement.parentNode) {
+                        preElement.parentNode.insertBefore(newParagraph, preElement.nextSibling);
                         
-                        // Move cursor to the new list item
+                        // Move cursor to the new paragraph
                         const range = document.createRange();
                         const sel = window.getSelection();
-                        range.setStart(newListItem, 0);
+                        range.setStart(newParagraph, 0);
                         range.collapse(true);
                         sel?.removeAllRanges();
                         sel?.addRange(range);
@@ -2338,44 +2063,187 @@ export const Editor = ({ noteIdOverride }: { noteIdOverride?: string | null } = 
                           setContent(contentRef.current.innerHTML);
                         }
                       }
-                    }
-                  } else {
-                    // Normal text (not in list or code block) - Clear inline formatting after Enter
-                    // Kullanıcı Enter bastığında, seçili araçların formatını hemen kapat
-                    requestAnimationFrame(() => {
-                      const inlineFormats: Array<{ key: keyof typeof activeFormats; cmd: string }> = [
-                        { key: 'bold', cmd: 'bold' },
-                        { key: 'italic', cmd: 'italic' },
-                        { key: 'underline', cmd: 'underline' },
-                        { key: 'strikethrough', cmd: 'strikeThrough' },
-                      ];
+                    };
 
-                      inlineFormats.forEach(({ cmd }) => {
-                        if (document.queryCommandState(cmd)) {
-                          document.execCommand(cmd, false);
+                    // Handle Enter key for code blocks FIRST (before Shift+Enter)
+                    if (e.key === 'Enter') {
+                      const codeBlock = isInCodeBlock();
+                      if (codeBlock) {
+                        // ALWAYS prevent default to stop block splitting
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        if (e.shiftKey) {
+                          // Shift+Enter: Break out of code block
+                          exitCodeBlock(codeBlock);
+                          return;
+                        } else {
+                          // Normal Enter: Insert newline inside the block
+                          const selection = window.getSelection();
+                          if (!selection || selection.rangeCount === 0) return;
+                          
+                          const range = selection.getRangeAt(0);
+                          
+                          // Find the <code> element inside the <pre>
+                          const codeElement = codeBlock.querySelector('code');
+                          if (!codeElement) return;
+                          
+                          // Delete any selected content first
+                          range.deleteContents();
+                          
+                          // Create a newline text node
+                          const newline = document.createTextNode('\n');
+                          range.insertNode(newline);
+                          
+                          // Move cursor after the newline
+                          range.setStartAfter(newline);
+                          range.setEndAfter(newline);
+                          range.collapse(false);
+                          
+                          selection.removeAllRanges();
+                          selection.addRange(range);
+                          
+                          // Force focus back to the code element
+                          codeElement.focus();
+                          
+                          // Update content state
+                          if (contentRef.current) {
+                            setContent(contentRef.current.innerHTML);
+                          }
+                          
+                          // Trigger a manual input event to update the state
+                          const inputEvent = new Event('input', { bubbles: true });
+                          contentRef.current?.dispatchEvent(inputEvent);
+                          
+                          return;
                         }
-                      });
+                      }
+                    }
 
-                      syncToolbarState();
-                    });
-                  }
-                }
-              }}
-              onMouseUp={() => {
-                syncToolbarState();
-                saveCursorPosition();
-              }}
-              onKeyUp={() => {
-                syncToolbarState();
-                saveCursorPosition();
-              }}
-              onClick={() => {
-                syncToolbarState();
-              }}
-              suppressContentEditableWarning
-            />
-          </div>
-        </div>
+                    // Handle Arrow Down to exit code block when at the end
+                    if (e.key === 'ArrowDown') {
+                      const codeBlock = isInCodeBlock();
+                      if (codeBlock && isCursorAtEndOfCodeBlock(codeBlock)) {
+                        // Check if there's a next sibling
+                        const nextSibling = codeBlock.nextSibling;
+                        if (!nextSibling) {
+                          // No next sibling, create a new paragraph
+                          exitCodeBlock(codeBlock);
+                        } else {
+                          // There's a next sibling, let the default behavior handle it
+                          // But we need to ensure the cursor moves to it
+                          e.preventDefault();
+                          const range = document.createRange();
+                          const sel = window.getSelection();
+                          
+                          // Try to set cursor at the start of the next sibling
+                          if (nextSibling.nodeType === Node.TEXT_NODE) {
+                            range.setStart(nextSibling, 0);
+                          } else if (nextSibling.nodeType === Node.ELEMENT_NODE) {
+                            range.setStart(nextSibling, 0);
+                          }
+                          range.collapse(true);
+                          sel?.removeAllRanges();
+                          sel?.addRange(range);
+                        }
+                        return;
+                      }
+                    }
+                    
+                    // Handle Enter key for lists - allow empty list items
+                    if (e.key === 'Enter') {
+                      const selection = window.getSelection();
+                      if (!selection || selection.rangeCount === 0) return;
+                      
+                      let node = selection.anchorNode;
+                      if (!node) return;
+                      
+                      // Find the parent list item
+                      let listItem: HTMLElement | null = null;
+                      let currentNode: Node | null = node;
+                      
+                      while (currentNode && currentNode !== contentRef.current) {
+                        if (currentNode.nodeType === Node.ELEMENT_NODE) {
+                          const element = currentNode as HTMLElement;
+                          if (element.tagName === 'LI') {
+                            listItem = element;
+                            break;
+                          }
+                        }
+                        currentNode = currentNode.parentNode;
+                      }
+                      
+                      // If we're inside a list item
+                      if (listItem) {
+                        // Check if the list item is empty or only contains whitespace/br
+                        const textContent = listItem.textContent?.trim() || '';
+                        const hasOnlyBr = listItem.innerHTML.trim() === '<br>' || listItem.innerHTML.trim() === '';
+                        
+                        if (textContent === '' || hasOnlyBr) {
+                          // Prevent default behavior (which would exit the list)
+                          e.preventDefault();
+                          
+                          // Create a new empty list item
+                          const newListItem = document.createElement('li');
+                          newListItem.innerHTML = '<br>'; // Add a br to make it visible
+                          
+                          // Insert the new list item after the current one
+                          if (listItem.parentNode) {
+                            listItem.parentNode.insertBefore(newListItem, listItem.nextSibling);
+                            
+                            // Move cursor to the new list item
+                            const range = document.createRange();
+                            const sel = window.getSelection();
+                            range.setStart(newListItem, 0);
+                            range.collapse(true);
+                            sel?.removeAllRanges();
+                            sel?.addRange(range);
+                            
+                            // Update content state
+                            if (contentRef.current) {
+                              setContent(contentRef.current.innerHTML);
+                            }
+                          }
+                        }
+                      } else {
+                        // Normal text (not in list or code block) - Clear inline formatting after Enter
+                        // Kullanıcı Enter bastığında, seçili araçların formatını hemen kapat
+                        requestAnimationFrame(() => {
+                          const inlineFormats: Array<{ key: keyof typeof activeFormats; cmd: string }> = [
+                            { key: 'bold', cmd: 'bold' },
+                            { key: 'italic', cmd: 'italic' },
+                            { key: 'underline', cmd: 'underline' },
+                            { key: 'strikethrough', cmd: 'strikeThrough' },
+                          ];
+
+                          inlineFormats.forEach(({ cmd }) => {
+                            if (document.queryCommandState(cmd)) {
+                              document.execCommand(cmd, false);
+                            }
+                          });
+
+                          syncToolbarState();
+                        });
+                      }
+                    }
+                  }}
+                  onMouseUp={() => {
+                    syncToolbarState();
+                    saveCursorPosition();
+                  }}
+                  onKeyUp={() => {
+                    syncToolbarState();
+                    saveCursorPosition();
+                  }}
+                  onClick={() => {
+                    syncToolbarState();
+                  }}
+                  suppressContentEditableWarning
+                />
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Saved Toast */}
         <Toast isVisible={showSaved} message={t('saved')} type="success" />

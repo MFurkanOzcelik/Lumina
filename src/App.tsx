@@ -70,6 +70,18 @@ function App() {
     setSecondaryNoteId(null);
   };
 
+  // Ana paneli kapat (Smart Close Logic)
+  const handleCloseMainPane = () => {
+    if (secondaryNoteId) {
+      // Split varsa: Sağdaki notu ana panele taşı
+      setActiveNote(secondaryNoteId);
+      setSecondaryNoteId(null);
+    } else {
+      // Split yoksa: Ana notu kapat
+      setActiveNote(null);
+    }
+  };
+
   // Ana konteyner Drag Over - hedef bölgeyi belirle
   const handleMainDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -341,50 +353,16 @@ function App() {
     }
   }, [createNote, setActiveNote]);
 
-  // Handle external file opening (txt, md, json, lum, pdf) from "Open with Lumina"
+  // Handle external file opening (txt, md, json, lum) from "Open with Lumina"
   useEffect(() => {
     if (window.electronAPI?.onOpenExternalFile) {
       window.electronAPI.onOpenExternalFile((data: any) => {
-        const { fileName, content, fileType, filePath, isPdf } = data;
+        const { fileName, content, fileType } = data;
         
-        console.log('[App] Dış dosya açılıyor:', fileName, fileType, 'isPdf:', isPdf);
+        console.log('[App] Dış dosya açılıyor:', fileName, fileType);
         
         // Create a new note
         const newNoteId = createNote(null);
-        
-        // For PDF files, attach the file
-        if (isPdf && filePath) {
-          setTimeout(() => {
-            const notesStore = useNotesStore.getState();
-            
-            // Read the PDF file as blob
-            fetch(`file:///${filePath.replace(/\\/g, '/')}`)
-              .then(res => res.blob())
-              .then(blob => {
-                notesStore.updateNote(newNoteId, { 
-                  title: fileName,
-                  content: '',
-                  attachment: {
-                    name: fileName + '.pdf',
-                    type: 'application/pdf',
-                    size: blob.size,
-                    blob: blob
-                  }
-                });
-                setActiveNote(newNoteId);
-              })
-              .catch(err => {
-                console.error('[App] PDF yüklenirken hata:', err);
-                // Fallback: just set title
-                notesStore.updateNote(newNoteId, { 
-                  title: fileName,
-                  content: `<p>PDF dosyası: ${fileName}.pdf</p>`
-                });
-                setActiveNote(newNoteId);
-              });
-          }, 100);
-          return;
-        }
         
         // Parse content based on file type for text files
         let noteContent = content;
@@ -601,7 +579,40 @@ function App() {
               {dragHighlight === 'left-pane' && (
                 <div className="drag-overlay" style={{ position: 'absolute', inset: 0 }} />
               )}
-              <AnimatePresence mode="wait">
+
+              {/* Başlık Çubuğu - Kapat Butonu (Left Pane) */}
+              <div
+                className="flex-none flex items-center justify-between px-4 py-2 border-b"
+                style={{
+                  backgroundColor: 'var(--color-bgSecondary)',
+                  borderColor: 'var(--color-border)',
+                }}
+              >
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
+                  {activeNoteId 
+                    ? (notes.find(n => n.id === activeNoteId)?.title || t('untitledNote'))
+                    : t('mainPane')
+                  }
+                </h3>
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={handleCloseMainPane}
+                  className="p-1 rounded transition-all"
+                  style={{
+                    color: 'var(--color-text)',
+                    backgroundColor: 'var(--color-bgTertiary)',
+                  }}
+                  title={t('closeMainPane')}
+                >
+                  <X size={18} />
+                </motion.button>
+              </div>
+
+              {/* Editor İçeriği */}
+              <div className="flex-1 overflow-hidden">
+                <AnimatePresence mode="wait">
                 {viewMode === 'kanban' ? (
                   <motion.div
                     key="kanban-left"
@@ -636,7 +647,8 @@ function App() {
                     <HomePage />
                   </motion.div>
                 )}
-              </AnimatePresence>
+                </AnimatePresence>
+              </div>
             </div>
 
             {/* Ayırıcı (Resizer) */}
@@ -664,7 +676,7 @@ function App() {
                 }}
               >
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>
-                  {notes.find(n => n.id === secondaryNoteId)?.title || 'Untitled Note'}
+                  {notes.find(n => n.id === secondaryNoteId)?.title || t('untitledNote')}
                 </h3>
                 <motion.button
                   type="button"
@@ -676,7 +688,7 @@ function App() {
                     color: 'var(--color-text)',
                     backgroundColor: 'var(--color-bgTertiary)',
                   }}
-                  title="Yan paneli kapat"
+                  title={t('closeSecondaryPane')}
                 >
                   <X size={18} />
                 </motion.button>

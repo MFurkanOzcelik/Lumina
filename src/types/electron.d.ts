@@ -27,6 +27,7 @@ export interface ElectronAPI {
   getAppPath: () => Promise<string>;
   platform: string;
   isElectron: boolean;
+  getPathForFile: (file: File) => string;
   storage: ElectronStorage;
   // File opening
   onOpenLumFile?: (callback: (data: { fileName: string; content: string; filePath: string }) => void) => void;

@@ -30,44 +30,111 @@ export const HomePage = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    console.log('🔴 [HomePage] UPLOAD RAW FILE:', file);
+    console.log('🔴 [HomePage] FILE.NAME:', file.name);
+    const filePath = window.electronAPI?.getPathForFile
+      ? window.electronAPI.getPathForFile(file)
+      : (file as any)?.path;
+    console.log('🔴 [HomePage] FILE.PATH:', filePath);
+    console.log('🔴 [HomePage] FILE.TYPE:', file.type);
+    console.log('🔴 [HomePage] FILE.SIZE:', file.size);
+
     // Check file size (50MB limit)
     const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
     if (file.size > MAX_FILE_SIZE) {
-      setToastMessage('Dosya çok büyük! Maksimum boyut 50MB.');
+      setToastMessage(t('fileTooLarge'));
       setToastType('error');
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
       return;
     }
 
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+
+    if (isPdf) {
+      if (!filePath) {
+        alert('Hata: Dosya yolu (Path) bulunamadı. Electron güvenlik ayarı veya dosya sürükleme hatası.');
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        return;
+      }
+
+      try {
+        const noteId = createNote(null);
+        updateNote(noteId, {
+          title: file.name,
+          content: '',
+          attachment: {
+            name: file.name,
+            type: file.type || 'application/pdf',
+            size: file.size,
+            blob: { path: filePath },
+          },
+        });
+        setActiveNote(noteId);
+
+        setToastMessage(`${file.name} ${t('fileUploadSuccess')}`);
+        setToastType('success');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 2000);
+      } catch (error) {
+        console.error('Error handling PDF upload:', error);
+        setToastMessage(t('fileUploadError'));
+        setToastType('error');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      } finally {
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+
+      return; // Prevent FileReader from processing binary PDF content
+    }
+
     try {
-      // Create new note with file attachment
+      // Create new note for text-based content
       const noteId = createNote(null);
-      
-      // Add file attachment to the note
-      const attachment = {
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        blob: file,
+      console.log('🔴 [HomePage] NOTEID CREATED:', noteId);
+
+      // Read file as text - only for non-PDF files
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const fileContent = e.target?.result as string;
+        
+        console.log('🔴 [HomePage] FILE READ SUCCESS, CONTENT LENGTH:', fileContent.length);
+        
+        // Update note with file content and name as title
+        const updates = {
+          title: file.name,
+          content: `<p>${fileContent.replace(/\n/g, '</p><p>')}</p>`,
+        };
+        
+        console.log('🔴 [HomePage] CALLING updateNote WITH:', { noteId, updates });
+        updateNote(noteId, updates);
+        console.log('🔴 [HomePage] updateNote CALLED');
+
+        // Open the note
+        setActiveNote(noteId);
+
+        setToastMessage(`${file.name} ${t('fileUploadSuccess')}`);
+        setToastType('success');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 2000);
       };
-
-      // Update note with attachment and set title to filename
-      updateNote(noteId, {
-        title: file.name,
-        attachment,
-      });
-
-      // Open the note
-      setActiveNote(noteId);
-
-      setToastMessage(`${file.name} başarıyla yüklendi!`);
-      setToastType('success');
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 2000);
+      
+      reader.onerror = () => {
+        setToastMessage(t('fileUploadError'));
+        setToastType('error');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 2000);
+      };
+      
+      reader.readAsText(file);
     } catch (error) {
       console.error('Error uploading file:', error);
-      setToastMessage('Dosya yüklenirken hata oluştu.');
+      setToastMessage(t('fileUploadError'));
       setToastType('error');
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);

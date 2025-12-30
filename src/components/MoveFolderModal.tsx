@@ -2,6 +2,8 @@ import { motion } from 'framer-motion';
 import { Folder, FolderOpen } from 'lucide-react';
 import { Modal } from './Modal';
 import { useNotesStore } from '../store/useNotesStore';
+import { useTranslation } from '../utils/translations';
+import { useSettingsStore } from '../store/useSettingsStore';
 
 interface MoveFolderModalProps {
   isOpen: boolean;
@@ -11,6 +13,8 @@ interface MoveFolderModalProps {
 
 export const MoveFolderModal = ({ isOpen, onClose, noteId }: MoveFolderModalProps) => {
   const { folders, moveNoteToFolder } = useNotesStore();
+  const language = useSettingsStore((state) => state.language);
+  const t = useTranslation(language);
 
   const handleMoveToFolder = (folderId: string | null) => {
     moveNoteToFolder(noteId, folderId);
@@ -18,7 +22,7 @@ export const MoveFolderModal = ({ isOpen, onClose, noteId }: MoveFolderModalProp
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Klasör Seç">
+    <Modal isOpen={isOpen} onClose={onClose} title={t('selectFolder')}>
       <div className="space-y-2">
         {/* No Folder Option */}
         <motion.button
@@ -33,7 +37,7 @@ export const MoveFolderModal = ({ isOpen, onClose, noteId }: MoveFolderModalProp
           }}
         >
           <FolderOpen size={20} />
-          <span className="font-medium">Klasörsüz Notlar</span>
+          <span className="font-medium">{t('folderlessNotes')}</span>
         </motion.button>
 
         {/* Folder List */}
@@ -60,7 +64,7 @@ export const MoveFolderModal = ({ isOpen, onClose, noteId }: MoveFolderModalProp
             className="text-center py-4 text-sm italic"
             style={{ color: 'var(--color-textSecondary)' }}
           >
-            Henüz klasör yok
+            {t('noFolders')}
           </p>
         )}
       </div>

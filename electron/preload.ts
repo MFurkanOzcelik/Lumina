@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 // Renderer'a güvenli API köprüsü
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAppPath: (): Promise<string> => ipcRenderer.invoke('get-app-path'),
   platform: process.platform,
   isElectron: true,
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
 
   // Dosya açma olayları
   onOpenLumFile: (callback: (data: { fileName: string; content: string; filePath: string }) => void) => {
